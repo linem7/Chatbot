@@ -1,0 +1,16 @@
+# Web Search 只用 Provider 的原生能力，DeepSeek 不联网
+
+用户不想接外部搜索服务，所以 Web Search 只使用 Provider 在服务端提供的原生搜索：Anthropic 的 `web_search` 工具，以及 Gemini 的 `google_search`。OpenAI 兼容 Provider 在 v1 不支持搜索。原因有两个：DeepSeek API 根本没有原生搜索（截至 2026-10 只支持 `function` 类型的工具）；OpenAI 官方只有专用的搜索模型，而且每次请求都会先搜一遍。
+
+这意味着**用户主要使用的 DeepSeek 没有联网能力**。「是否支持 Web Search」是 Model Capabilities 的一项，Model 不支持时，面板上的搜索开关会置灰。
+
+## Considered Options
+
+- **由模型发起 tool call，app 用 Tavily 执行搜索**（#1 开图时的原方案，研究见 #5）：否决。DeepSeek 也能搜，但要多接一个外部服务，多管理一个 key。
+- **混合方案：有原生搜索就用原生，DeepSeek 用 Tavily**：否决。要维护两套搜索路径和两套来源格式。
+
+## Consequences
+
+- Gemini 的条款要求必须原样展示「搜索建议」组件（`searchEntryPoint.renderedContent`，一段 HTML），所以要在回答下方用 WebView 渲染它。另外 Gemini 的搜索次数无法限制。
+- Anthropic 用 `max_uses: 3` 限制每个 Turn 的搜索次数，同时要处理 `pause_turn` 续接，以及搜索结果块的原样回传。
+- 如果以后要让 DeepSeek 也能联网，从 `docs/research/search-providers.md` 开始，由 Turn 执行一个 app 侧的搜索工具即可，ADR-0001 的结构不需要改。

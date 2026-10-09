@@ -21,7 +21,7 @@ _Avoid_: 配置实例、Service、Account、Endpoint
 用户在设置里指定的一个 Model。新建 Conversation 时默认使用它。
 
 **Model Capabilities**:
-一个 Model 能接受什么输入、能做什么：是否支持图片、PDF、tool calling。决定截图和上传入口是否可用。
+一个 Model 能接受什么输入、能做什么：是否支持图片、tool calling、Web Search。决定粘贴图片和搜索开关是否可用。
 _Avoid_: Provider 能力（能力属于 Model，不属于 Provider）
 
 ### 界面
@@ -51,6 +51,14 @@ _Avoid_: tool 消息（工具调用和结果是 assistant Message 的一部分�
 **Attachment**:
 附在用户 Message 上的一个文件，类型是图片、PDF 或文本文件。可以通过「+」、粘贴或拖拽加入，三种方式按同一套规则处理。PDF 以抽取出的文本形式发给模型。
 _Avoid_: 附件文件、Upload、截图（v1 没有内置截图，截图只是用户粘贴进来的一张图片）
+
+**Web Search**:
+模型在回答过程中自己发起的联网搜索，由 Provider 在服务端执行，app 不调用任何外部搜索服务。只有 Model Capabilities 里支持 Web Search 的 Model 才能用。
+_Avoid_: 联网问答、搜索工具、Tavily
+
+**Citation**:
+回答正文中某段内容所依据的一条网页来源，包括标题和 URL。在正文里显示为角标，并汇总在回答末尾。
+_Avoid_: 引用链接、Source
 
 **Turn**:
 从用户发出一条 Message 开始，到模型给出最终回答为止的整个过程。中间可能包含多次模型调用和工具调用。
