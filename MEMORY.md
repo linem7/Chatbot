@@ -34,7 +34,7 @@
     - system prompt 的当前日期由 app 在发送时加在最前面，不在可编辑文本里：SPEC §3、ARCHITECTURE §5.1；
     - 在 Main Window 里继续对话，是把对话装回 Quick Panel 继续：SPEC §8。
   - lead 定的，或者按用户的原则推出来的：
-    - 生成中切换 Model 也先停止再切换（同 ⌘N）：SPEC §3；
+    - 生成中切换 Model 也和 ⌘N 一样，先停止再新开 Conversation：SPEC §3；
     - Sonnet 5.5 用 `thinking: between_tools` 关闭思考：ADR-0002、ARCHITECTURE §3.2；
     - Gemini 的思考档位和能力来自内置表 `GeminiModelTable`：ADR-0002、ARCHITECTURE §3.2；
     - 错误按钮表里 `authentication` 也给「重试」：SPEC §7。
