@@ -15,18 +15,23 @@
 - #7（Provider 抽象）已关闭，产出 `CONTEXT.md`、`docs/adr/0001`、`docs/adr/0002`。
 - #8（Hotkey 与 Quick Panel 行为）已关闭，结论在 issue 评论里。
 - #9 以「不做」关闭：v1 没有内置截图，用户用其他工具截图后粘贴。粘贴细节并入 #10，#1、#10、#16 的描述已同步修改；#3 的截图研究只作存档。
-- #10（Attachment）已关闭。用户新提出「超过 1 个月没有新消息的 Conversation 自动删除」，已写进 #12 的描述，待在 #12 里细化。
+- #10（Attachment）已关闭。用户提出的「超过 1 个月没有新消息的 Conversation 自动删除」在 #12 里定为 30 天静默清理。
 - #11（Web Search）已关闭：只用 Anthropic、Gemini 的原生搜索，DeepSeek 不联网（ADR-0003）；ADR-0001 已同步修订；#5 的 Tavily 研究只作存档。
 - #12（本地历史）已关闭：用 GRDB 存储（ADR-0004），30 天静默清理，标题由模型生成，支持全文搜索，永远不做导出。
 - #13（设置）已关闭：key 存 Keychain，设置是独立窗口，分三个标签页；去掉了「手动覆盖 Model Capabilities」（修改了 #7 的结论，已在 #7 补充说明）；界面做中英文，跟随系统。
-- #14（工程基线）已关闭：最低支持 macOS 26；工程用 XcodeGen 生成；分层是 App target 加本地 SPM 包 ChatbotCore；用自签名证书签名、不做公证（ADR-0005）；CI 负责构建、测试和按 tag 发布；更新只做「有新版本」提示；日志只用 os.Logger；Swift 6 + Swift Testing；bundle id 是 com.linem7.Chatbot。
+- #14（工程基线）已关闭：最低支持 macOS 26；工程用 XcodeGen 生成；分层是 App target 加本地 SPM 包 ChatbotCore；用自签名证书签名、不做公证（ADR-0005）；CI 负责构建和测试（v1 不发布、不做更新检查，见下）；日志只用 os.Logger；Swift 6 + Swift Testing；bundle id 是 com.linem7.Chatbot。
 - #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。B 方案的原型发布在 GitHub Pages：https://linem7.github.io/Chatbot/ （源是孤儿分支 `gh-pages`，只有 `index.html` 和 `.nojekyll`）。`prototype/quick-panel` 分支已删除；含三个变体的完整版只剩 Claude Artifact 那份。
 - #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
 - v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
-- 2026-10-09 应用户要求，仓库最终改为 **public**，这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。
-- 实现 ticket 按 ARCHITECTURE §9 的顺序创建，都带 `v1` label。下一步从「实现 1：工程骨架」开始。
-- 仓库可见性在 2026-10-09 来回改过几次，最终是 **public**。GitHub Pages 已从 `gh-pages` 分支重新开启。
+- 2026-10-09 应用户要求，仓库最终改为 **public**（来回改过几次），这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。GitHub Pages 已从 `gh-pages` 分支重新开启。
+- **2026-10-09 v1 实现完成**：实现 ticket #17–#25 全部关闭，PR 是 #26–#41。**下一步是用户在 Mac 上按 #39（真机验证清单）逐项验证**，发现的问题再开 issue。
+- 实现阶段用户亲自定的几条，都已经写进文档，以文档为准：
+  - 其他 app 的 Hotkey 冲突检测不到，只给静态提示：SPEC §2.1；
+  - 生成中按 ⌘N 或切换 Model，先停止当前回答（保留为 Interrupted）再新开：SPEC §2.4、§3；
+  - Claude（和 Gemini）的思考「能关就关」，关不掉的压到最低档：ADR-0002；
+  - system prompt 的当前日期由 app 在发送时加在最前面，不在可编辑文本里：SPEC §3、ARCHITECTURE §5.1；
+  - 在 Main Window 里继续对话，是把对话装回 Quick Panel 继续：SPEC §8。
 
 ## 偏好补充
 
@@ -35,3 +40,4 @@
   - 2026-10-09 起这台机器装了 Swift 6.3.3（swiftly，在 `~/.local/share/swiftly`，没改 shell 配置），可以在 Linux 上跑 ChatbotCore 的 `swift test`。用之前先 `source ~/.local/share/swiftly/env.sh`。系统没有 SQLite 头文件，GRDB 要用解到用户目录的 libsqlite3-dev，在仓库根目录执行：
     `swift test --package-path Packages/ChatbotCore -Xcc -I$HOME/.local/share/sqlite3-dev/root/usr/include -Xlinker -L$HOME/.local/share/sqlite3-dev/root/usr/lib/x86_64-linux-gnu`
   - Linux 上没有 `URLSession.bytes(for:)`，`URLSessionTransport` 只在 Darwin 上编译，真实网络调用和 App target 仍然只能靠 CI 或用户在 Mac 上验证。
+  - 这台机器内存紧张：等 CI 时在前台查结果，不要开后台常驻的监视进程。
