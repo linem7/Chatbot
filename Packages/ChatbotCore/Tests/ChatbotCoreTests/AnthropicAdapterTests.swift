@@ -17,16 +17,20 @@ struct AnthropicAdapterTests {
     private func model(
         _ id: String = "claude-opus-5",
         thinkingCanBeDisabled: Bool = true,
+        betweenTools: Bool? = nil,
         lowEffort: Bool = true,
         imageInput: Bool = true,
         maxOutputTokens: Int? = 128_000
     ) -> ModelInfo {
+        var thinkingTypes: [String: JSONValue] = [
+            "adaptive": .object(["supported": .bool(true)]),
+            "disabled": .object(["supported": .bool(thinkingCanBeDisabled)]),
+        ]
+        // between_tools 这一项在 /v1/models 里还没有官方示例，nil 表示接口不报告这一项
+        if let betweenTools { thinkingTypes["between_tools"] = .object(["supported": .bool(betweenTools)]) }
         let providerData: JSONValue = .object([
             "effort": .object(["supported": .bool(lowEffort), "low": .object(["supported": .bool(lowEffort)])]),
-            "thinking": .object([
-                "supported": .bool(true),
-                "types": .object(["disabled": .object(["supported": .bool(thinkingCanBeDisabled)])]),
-            ]),
+            "thinking": .object(["supported": .bool(true), "types": .object(thinkingTypes)]),
         ])
         return ModelInfo(
             id: id,
@@ -225,7 +229,7 @@ struct AnthropicAdapterTests {
         (402, [:], errorBody("billing_error", "credit balance too low"), ChatError.rateLimited(retryAfter: nil)),
         (403, [:], errorBody("permission_error", "not allowed"), ChatError.providerError("not allowed")),
         (404, [:], errorBody("not_found_error", "model: claude-x"), ChatError.invalidRequest("model: claude-x")),
-        (413, [:], errorBody("request_too_large", "Request exceeds the maximum allowed size"), ChatError.invalidRequest("Request exceeds the maximum allowed size")),
+        (413, [:], errorBody("request_too_large", "Request exceeds the maximum allowed size"), ChatError.contextTooLong),
         (429, ["retry-after": "12"], errorBody("rate_limit_error", "slow down"), ChatError.rateLimited(retryAfter: 12)),
         (400, [:], errorBody("invalid_request_error", "prompt is too long: 1000123 tokens > 1000000 maximum"), ChatError.contextTooLong),
         (400, [:], errorBody("invalid_request_error", "messages: roles must alternate"), ChatError.invalidRequest("messages: roles must alternate")),
@@ -286,6 +290,94 @@ struct AnthropicAdapterTests {
         let lowEffort: JSONValue = .object(["effort": .string("low")])
         #expect(fields["thinking"] == nil)
         #expect(fields["output_config"] == lowEffort)
+    }
+
+    /// 一轮已经完成的回答，原生块里有一个思考块。
+    private var answerWithThinking: Message {
+        let raw: JSONValue = .array([
+            .object(["type": .string("thinking"), "thinking": .string(""), "signature": .string("sig")]),
+            .object(["type": .string("text"), "text": .string("答案")]),
+        ])
+        return Message(role: .assistant, content: [ContentBlock(.opaque(provider: .anthropic, raw)), ContentBlock(.text("答案"))])
+    }
+
+    private func sent(_ request: ModelRequest) async throws -> (headers: [String: String], body: [String: JSONValue]) {
+        let transport = StubTransport(body: textBlock + messageDelta("end_turn") + messageStop)
+        _ = try await collect(transport, request)
+        let sent = try #require(transport.requests.first)
+        guard case .object(let fields) = try JSONDecoder().decode(JSONValue.self, from: try #require(sent.body)) else {
+            Issue.record("body 不是对象")
+            return (sent.headers, [:])
+        }
+        return (sent.headers, fields)
+    }
+
+    @Test(arguments: [
+        ("", false),
+        ("今天是 2026-10-09", false),
+        ("今天是 2026-10-10", true),
+    ])
+    func replayedThinkingBlocksAreDroppedInsteadOfFailingWhenThePrefixChanged(systemPrompt: String, webSearch: Bool) async throws {
+        // 思考块的签名绑定了 system、tools 和之前的消息。system 里的日期变了、地球按钮切换了 tools 时，
+        // 关不掉思考的 Model 会一直 400；所以回传思考块时声明 drop_block，让服务端丢掉对不上的块
+        let opus55 = model("claude-opus-5-5", thinkingCanBeDisabled: false)
+        let (headers, fields) = try await sent(request(
+            models: [opus55], modelID: "claude-opus-5-5", systemPrompt: systemPrompt,
+            messages: [.user("一"), answerWithThinking, .user("二")], webSearch: webSearch
+        ))
+        let adaptive: JSONValue = .object([
+            "type": .string("adaptive"),
+            "block_binding": .object(["prefix_mismatch_behavior": .string("drop_block")]),
+        ])
+        #expect(fields["thinking"] == adaptive)
+        #expect(headers["anthropic-beta"] == "thinking-binding-controls-2026-08-01")
+        #expect((fields["tools"] != nil) == webSearch)
+    }
+
+    @Test func noBindingControlsWhenNoThinkingBlockIsReplayed() async throws {
+        let opus55 = model("claude-opus-5-5", thinkingCanBeDisabled: false)
+        let (headers, fields) = try await sent(request(models: [opus55], modelID: "claude-opus-5-5"))
+        #expect(fields["thinking"] == nil)
+        #expect(headers["anthropic-beta"] == nil)
+    }
+
+    @Test func disabledThinkingNeverCarriesBindingControls() async throws {
+        // block_binding 只能和 adaptive 一起发，和 disabled 一起发会 400
+        let (headers, fields) = try await sent(request(messages: [.user("一"), answerWithThinking, .user("二")]))
+        let disabled: JSONValue = .object(["type": .string("disabled")])
+        #expect(fields["thinking"] == disabled)
+        #expect(headers["anthropic-beta"] == nil)
+    }
+
+    @Test func sonnet55TurnsThinkingOffWithBetweenToolsAndDoesNotReplayThinkingBlocks() async throws {
+        // Sonnet 5.5：disabled 会 400，用 between_tools 关闭；between_tools 不接受 block_binding，
+        // 它在工具调用之间写的进度思考块就不回传，history 前缀因此始终一致
+        let sonnet55 = model("claude-sonnet-5-5", thinkingCanBeDisabled: false, betweenTools: true)
+        let (headers, fields) = try await sent(request(
+            models: [sonnet55], modelID: "claude-sonnet-5-5",
+            messages: [.user("一"), answerWithThinking, .user("二")]
+        ))
+        let betweenTools: JSONValue = .object(["type": .string("between_tools")])
+        let lowEffort: JSONValue = .object(["effort": .string("low")])
+        #expect(fields["thinking"] == betweenTools)
+        #expect(fields["output_config"] == lowEffort)
+        #expect(headers["anthropic-beta"] == nil)
+        let expected: JSONValue = .array([
+            turn("user", .string("一")),
+            turn("assistant", .array([.object(["type": .string("text"), "text": .string("答案")])])),
+            turn("user", .string("二")),
+        ])
+        #expect(fields["messages"] == expected)
+    }
+
+    @Test func pausedAnswersKeepTheirThinkingBlocksEvenWithBetweenTools() async throws {
+        // 同一个 Turn 里续接时 system 和 tools 都没变，进行中的回答要原样发回
+        let sonnet55 = model("claude-sonnet-5-5", thinkingCanBeDisabled: false, betweenTools: true)
+        let raw: JSONValue = .array([.object(["type": .string("thinking"), "thinking": .string("搜一下"), "signature": .string("s")])])
+        let paused = Message(role: .assistant, status: .streaming, content: [ContentBlock(.opaque(provider: .anthropic, raw))])
+        let (_, fields) = try await sent(request(models: [sonnet55], modelID: "claude-sonnet-5-5", messages: [.user("一"), paused]))
+        let expected: JSONValue = .array([turn("user", .string("一")), turn("assistant", raw)])
+        #expect(fields["messages"] == expected)
     }
 
     @Test func unknownModelsGetNeitherThinkingNorEffort() async throws {

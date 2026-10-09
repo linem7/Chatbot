@@ -78,7 +78,7 @@ enum ModelEvent {
 | | OpenAI 兼容（DeepSeek 等） | Anthropic Messages | Gemini `generateContent` |
 |---|---|---|---|
 | 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST /v1/messages` | `POST /v1beta/models/{m}:streamGenerateContent?alt=sse` |
-| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | Model 能关（capabilities 的 `thinking.types.disabled`）就发 `thinking: disabled`，关不掉的（Opus 5.5、Sonnet 5.5、Fable）不发；支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传（ADR-0002） | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
+| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | 能关就关（ADR-0002）：capabilities 里 `thinking.types.disabled` 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
 | system prompt | `role: "system"` 消息 | 顶层 `system` | 顶层 `systemInstruction` |
 | 图片 | `image_url` + base64 data URL | `image` block，base64 | `inlineData`，base64 |
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |
@@ -90,9 +90,15 @@ enum ModelEvent {
 - 请求：`POST {base}/v1/messages`，头部 `x-api-key` 和 `anthropic-version: 2023-06-01`。`max_tokens` 取 Model 报告的上限，最多 64000；不知道上限时用 16000。
 - Web Search 仍用 `web_search_20250305`（官方文档仍以它配 claude-opus-5-5 示例）。更新的版本走代码执行做动态过滤，更慢，响应里还会多出代码执行块。
 - 原样回传：流里每个完整的内容块通过 `providerData` 交给 TurnRunner，按顺序累积在 assistant Message 的第一个块 `opaque(.anthropic, [原生块…])` 里。complete 的回答（以及 `pause_turn` 续接时进行中的回答）逐字发回这一串；interrupted 或 failed 的回答里可能有不完整的工具块，只发文字。
+- 思考块的签名绑定了 `system`、`tools` 和之前的消息。system 里的日期变了、用户改了 system prompt、地球按钮切换了 tools，都会让原样回传的思考块对不上：
+  - adaptive（Opus 5.5、Fable）：请求里回传了思考块时，发 `thinking: {type: "adaptive", block_binding: {prefix_mismatch_behavior: "drop_block"}}` 和请求头 `anthropic-beta: thinking-binding-controls-2026-08-01`，服务端丢掉对不上的块，回答照常进行；
+  - `between_tools`（Sonnet 5.5）不接受 `block_binding`：之前完成的回答里的思考块（工具调用之间的进度说明）一律不回传，每次请求都这样处理，前缀始终一致；`pause_turn` 续接时进行中的回答照常原样发回；
+  - `disabled` 的 Model 不产生思考块，`block_binding` 和 disabled 一起发也会 400。
+- capabilities 里有没有 `between_tools` 这一项还没有官方示例，按「有就用、没有就当不支持」宽松处理；没有时 Sonnet 5.5 走 adaptive + drop_block，同样能用。
+- `pause_turn` 最多续接 5 次，到上限还没结束时回答标成 failed（只回传文字），避免下一次 Turn 回传一个没有结果的 `server_tool_use`。
 - Citation：adapter 在 text 块结束时按「这次调用输出的正文」给出 UTF-16 范围，TurnRunner 换算成所在 text 块里的偏移。
 - `stop_reason`：`refusal`（安全分类器拒答）报 `providerError`，不开服务端 fallback，因为 Conversation 的 Model 创建后不换；`model_context_window_exceeded` 按 `length` 处理。
-- 错误映射：401 → authentication；402（billing）和 429 → rateLimited；400 里的 "prompt is too long" → contextTooLong，其他 400、404、413 → invalidRequest；所有 5xx（含 529）→ overloaded；流中的 `event: error` 按 `error.type` 映射。
+- 错误映射：401 → authentication；402（billing）和 429 → rateLimited；400 里的 "prompt is too long" 和 413（请求超过 32MB，多半是图片和附件太多）→ contextTooLong，其他 400 和 404 → invalidRequest；所有 5xx（含 529）→ overloaded；流中的 `event: error` 按 `error.type` 映射。
 
 **Model Capabilities 的来源优先级**：接口报告 > 内置表 > 保守默认。保守默认是「只支持文本和 tools，不支持图片，不支持搜索」。用户不能手动修改。
 

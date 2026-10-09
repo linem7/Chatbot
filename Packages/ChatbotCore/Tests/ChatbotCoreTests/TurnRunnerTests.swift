@@ -169,6 +169,18 @@ struct TurnRunnerTests {
         #expect(continued.content.first == ContentBlock(.opaque(provider: .anthropic, .array([rawText, rawSearch, rawCited]))))
     }
 
+    @Test func tooManyPauseTurnsFailTheAnswer() async throws {
+        // 续接到上限还没结束，最后一个原生块可能是没有结果的 server_tool_use；标成 failed，下次只回传文字
+        let pause: [ScriptedAdapter.Step] = [.event(.textDelta("…")), .event(.finished(.pauseTurn))]
+        let adapter = ScriptedAdapter(Array(repeating: pause, count: 10))
+        let final = try finalMessage(await collect(runner(adapter).run(input())))
+        #expect(adapter.requests.count == 6)
+        guard case .failed(.providerError) = final.status else {
+            Issue.record("应该是 failed(providerError)，实际是 \(final.status)")
+            return
+        }
+    }
+
     @Test func errorKeepsPartialAnswerAndFails() async throws {
         let adapter = ScriptedAdapter([[.event(.textDelta("Hi")), .fail(ChatError.overloaded)]])
         let input = input()

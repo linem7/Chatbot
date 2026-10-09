@@ -3,8 +3,9 @@ import Foundation
 /// Anthropic Messages API 的 adapter（ARCHITECTURE §3.2）。没有官方 Swift SDK，直接用 HTTP。
 ///
 /// - 端点是 `POST {base}/v1/messages`，Model 列表是 `GET {base}/v1/models`（分页）。
-/// - 思考（ADR-0002）：Model 能关的就发 `thinking: disabled`；关不掉的（Opus 5.5、Sonnet 5.5、Fable）不发 thinking。
-///   两种情况都在支持时发 `output_config.effort: "low"`，把思考和延迟压到最低。是否支持都看 `/v1/models` 的 capabilities。
+/// - 思考（ADR-0002）：能关就关。Model 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；
+///   关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。
+///   支持时都发 `output_config.effort: "low"`，把思考和延迟压到最低。是否支持都看 `/v1/models` 的 capabilities。
 /// - Web Search 用 `web_search_20250305`，`max_uses: 3`（ADR-0003）。
 /// - 流里每个完整的内容块（thinking、server_tool_use、web_search_tool_result、带 citations 的 text）
 ///   都通过 `providerData` 原样交出去，由 TurnRunner 保存；继续对话时逐字发回（ADR-0001）。
@@ -110,18 +111,47 @@ public struct AnthropicAdapter: ProviderAdapter {
         let model = request.connection.models.first { $0.id == request.modelID }
         let capabilities = model?.providerData
 
+        // ADR-0002：能关就关。Sonnet 5.5 发 disabled 会 400，要用 between_tools 关；都关不掉的走 adaptive。
+        // capabilities 里有没有 between_tools 这一项还没有官方示例，按有就用、没有就当不支持处理
+        let thinkingTypes = capabilities?["thinking"]?["types"]
+        let thinkingMode: ThinkingMode
+        if thinkingTypes?["disabled"]?["supported"]?.boolValue == true {
+            thinkingMode = .disabled
+        } else if thinkingTypes?["between_tools"]?["supported"]?.boolValue == true {
+            thinkingMode = .betweenTools
+        } else if capabilities != nil {
+            thinkingMode = .adaptive
+        } else {
+            // 能力未知：什么都不发，避免 400
+            thinkingMode = .unknown
+        }
+
+        let messages = messages(for: request, stripThinkingFromEarlierTurns: thinkingMode == .betweenTools)
         var body: [String: JSONValue] = [
             "model": .string(request.modelID),
             "max_tokens": .number(Double(model?.maxOutputTokens.map { min($0, maxTokensCap) } ?? fallbackMaxTokens)),
             "stream": .bool(true),
-            "messages": .array(messages(for: request)),
+            "messages": .array(messages),
         ]
+        var headers = headers(request.apiKey).merging(["content-type": "application/json", "accept": "text/event-stream"]) { _, new in new }
         if !request.systemPrompt.isEmpty {
             body["system"] = .string(request.systemPrompt)
         }
-        // ADR-0002：能关的就关；关不掉时不发（发了会 400）
-        if capabilities?["thinking"]?["types"]?["disabled"]?["supported"]?.boolValue == true {
+        switch thinkingMode {
+        case .disabled:
             body["thinking"] = .object(["type": .string("disabled")])
+        case .betweenTools:
+            body["thinking"] = .object(["type": .string("between_tools")])
+        case .adaptive where replaysThinking(messages):
+            // 思考块的签名绑定了 system、tools 和之前的消息。system 里的日期变了、地球按钮切换了 tools 时，
+            // 原样回传的思考块会让请求一直 400；drop_block 让服务端丢掉对不上的块，回答照常进行（ADR-0002）
+            body["thinking"] = .object([
+                "type": .string("adaptive"),
+                "block_binding": .object(["prefix_mismatch_behavior": .string("drop_block")]),
+            ])
+            headers["anthropic-beta"] = thinkingBindingBeta
+        case .adaptive, .unknown:
+            break
         }
         if capabilities?["effort"]?["low"]?["supported"]?.boolValue == true {
             body["output_config"] = .object(["effort": .string("low")])
@@ -133,16 +163,44 @@ public struct AnthropicAdapter: ProviderAdapter {
         return HTTPRequest(
             method: "POST",
             url: request.connection.baseURL.appendingPathComponent("v1/messages"),
-            headers: headers(request.apiKey).merging(["content-type": "application/json", "accept": "text/event-stream"]) { _, new in new },
+            headers: headers,
             body: try JSONEncoder().encode(JSONValue.object(body))
         )
+    }
+
+    static let thinkingBindingBeta = "thinking-binding-controls-2026-08-01"
+
+    private enum ThinkingMode {
+        /// `thinking: disabled`（Opus 4.8、Opus 5、Haiku 5.5 等）
+        case disabled
+        /// `thinking: between_tools`（Sonnet 5.5）：不接受 block_binding
+        case betweenTools
+        /// 关不掉（Opus 5.5、Fable）：默认 adaptive，回传思考块时声明 drop_block
+        case adaptive
+        case unknown
+    }
+
+    private static let thinkingBlockTypes: Set<String> = ["thinking", "redacted_thinking"]
+
+    private static func isThinkingBlock(_ block: JSONValue) -> Bool {
+        block["type"]?.stringValue.map(thinkingBlockTypes.contains) ?? false
+    }
+
+    private static func replaysThinking(_ messages: [JSONValue]) -> Bool {
+        messages.contains { message in
+            if case .array(let blocks)? = message["content"] { return blocks.contains(where: isThinkingBlock) }
+            return false
+        }
     }
 
     private static func headers(_ apiKey: String) -> [String: String] {
         ["x-api-key": apiKey, "anthropic-version": apiVersion]
     }
 
-    private static func messages(for request: ModelRequest) -> [JSONValue] {
+    /// - Parameter stripThinkingFromEarlierTurns: between_tools 不接受 block_binding，所以之前完成的回答里的
+    ///   思考块（进度说明）一律不回传：每次请求都同样处理，前缀始终一致，不会触发签名校验。
+    ///   进行中的回答（pause_turn 续接）同一个 Turn 里 system 和 tools 不变，照常原样发回。
+    private static func messages(for request: ModelRequest, stripThinkingFromEarlierTurns: Bool) -> [JSONValue] {
         let acceptsImages = request.capabilities.imageInput
         return request.messages.compactMap { message in
             switch message.role {
@@ -154,9 +212,13 @@ public struct AnthropicAdapter: ProviderAdapter {
                 // 完整的回答（以及 pause_turn 续接时还在进行中的回答）把原生块逐字发回：
                 // 思考块的 signature、搜索结果的 encrypted_content、引用的 encrypted_index 都必须原样回传。
                 // 被取消或出错的回答里可能有不完整的工具块，只发文字。
-                if message.status == .complete || message.status == .streaming,
-                   let raw = rawBlocks(of: message), !raw.isEmpty {
-                    return .object(["role": .string("assistant"), "content": .array(raw)])
+                if message.status == .complete || message.status == .streaming, var raw = rawBlocks(of: message) {
+                    if stripThinkingFromEarlierTurns, message.status == .complete {
+                        raw.removeAll(where: isThinkingBlock)
+                    }
+                    if !raw.isEmpty {
+                        return .object(["role": .string("assistant"), "content": .array(raw)])
+                    }
                 }
                 let text = message.markdownText
                 if text.isEmpty { return nil }
@@ -219,7 +281,9 @@ public struct AnthropicAdapter: ProviderAdapter {
         case 402: throw ChatError.rateLimited(retryAfter: nil)
         case 429: throw ChatError.rateLimited(retryAfter: response.headers["retry-after"].flatMap { TimeInterval($0.trimmingCharacters(in: .whitespaces)) })
         case 400: throw invalidRequest(message)
-        case 404, 413: throw ChatError.invalidRequest(message)
+        // request_too_large：请求超过 32MB，多半是对话里的图片和附件太多，提示开新对话
+        case 413: throw ChatError.contextTooLong
+        case 404: throw ChatError.invalidRequest(message)
         // 包括 529 overloaded_error
         case 500..<600: throw ChatError.overloaded
         default: throw ChatError.providerError(message)

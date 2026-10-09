@@ -139,7 +139,12 @@ public struct TurnRunner: Sendable {
                 try Task.checkCancellation()
 
                 // .toolUse 时要执行 app 侧工具；v1 没有 app 侧工具，按结束处理
-                guard finishReason == .pauseTurn, continuations < Self.maxContinuations else { break }
+                guard finishReason == .pauseTurn else { break }
+                // 续接到上限还没结束：最后一个原生块可能是没有结果的 server_tool_use，
+                // 标成 failed，下次 Turn 只回传文字
+                guard continuations < Self.maxContinuations else {
+                    throw ChatError.providerError("回答需要的搜索步骤太多，没有完成")
+                }
                 continuations += 1
             }
             answer.status = .complete
