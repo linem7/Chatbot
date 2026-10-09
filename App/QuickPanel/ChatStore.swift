@@ -21,7 +21,14 @@ final class ChatStore {
     private(set) var hasUnread = false
     /// 发送前的问题（例如还没有 API key），显示在消息区底部。
     private(set) var notice: String?
-    private var turn: TurnHandle?
+    private var turn: TurnHandle? {
+        didSet {
+            if turn == nil { stopMenuBarAnimation() } else { startMenuBarAnimation() }
+        }
+    }
+    /// 生成中菜单栏图标的帧，由计时器推进。
+    private var menuBarFrame = 0
+    @ObservationIgnored private var menuBarAnimation: Task<Void, Never>?
     private var isPanelVisible = false
     private var lastTurnEndedAt: Date?
 
@@ -50,7 +57,7 @@ final class ChatStore {
     }
 
     var menuBarState: MenuBarIconState {
-        if isGenerating { return .generating }
+        if isGenerating { return .generating(frame: menuBarFrame) }
         return hasUnread ? .unread : .idle
     }
 
@@ -146,8 +153,8 @@ final class ChatStore {
         conversation.lastMessageAt = userMessage.createdAt
         self.conversation = conversation
 
-        // 没有内容的回答（例如一开始就失败了）不发回给模型
-        let history = messages.filter { $0.role == .user || !$0.content.isEmpty }
+        // 没有得到回答的问题由 TurnRunner 在拼请求时去掉
+        let history = messages
         messages.append(userMessage)
         draft = ""
         notice = nil
@@ -184,6 +191,23 @@ final class ChatStore {
         conversation?.lastMessageAt = now
         // 面板隐藏期间结束的，菜单栏显示未读
         if !isPanelVisible { hasUnread = true }
+    }
+
+    private func startMenuBarAnimation() {
+        menuBarAnimation?.cancel()
+        menuBarAnimation = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, !Task.isCancelled else { return }
+                self.menuBarFrame += 1
+            }
+        }
+    }
+
+    private func stopMenuBarAnimation() {
+        menuBarAnimation?.cancel()
+        menuBarAnimation = nil
+        menuBarFrame = 0
     }
 
     private func upsert(_ message: Message) {

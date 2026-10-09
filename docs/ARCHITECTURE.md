@@ -195,7 +195,7 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
   - 面板内的快捷键用本地 `NSEvent` monitor 按 keyCode 处理：Esc 隐藏面板，⌘. 停止生成，⌘N 新对话。不用 `.onExitCommand`，因为 AppKit 把 Esc 和 ⌘. 都映射为 `cancelOperation:`，没法区分；输入法正在组字时 Esc 交给输入法；
   - 按鼠标所在的屏幕定位。
 - **输入框**：用 `NSViewRepresentable` 包装 `NSTextView`，不用 SwiftUI 的 `TextEditor`。一是要在 `textView(_:doCommandBy:)` 里实现 ⏎ 发送、⇧⏎ 换行，输入法正在组字时 ⏎ 由输入法消费，不会误发送；二是面板显示时可以直接 `makeFirstResponder`，不依赖 `@FocusState`。面板不激活 app，⌘C、⌘V 等编辑命令由面板的 `performKeyEquivalent` 直接发给响应链。
-- **菜单栏**：使用 `MenuBarExtra`。图标的三种状态（空闲、生成中、有未读）由 store 驱动。
+- **菜单栏**：使用 `MenuBarExtra`。图标的三种状态（空闲、生成中、有未读）由 store 驱动。label 会被渲染成静态图片，`.symbolEffect` 不会播放，所以生成中由 store 的计时器每 0.5 秒切换一次帧（正常和变淡两张 template 图片）。
 - **界面文案**：用 String Catalog（`App/Resources/Localizable.xcstrings`），源语言英文，另加 zh-Hans，跟随系统语言。
 - **开机启动**：`SMAppService.mainApp`。
 - **Gemini 搜索建议**：在回答下方放一个小的 `WKWebView`，加载 `renderedContent`。

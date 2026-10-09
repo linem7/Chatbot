@@ -5,10 +5,28 @@ import SwiftUI
 @MainActor
 final class ComposerHandle {
     fileprivate weak var textView: NSTextView?
+    /// 要求聚焦时输入框还没创建或还不在窗口里，等它进入窗口时再补一次。
+    fileprivate var pendingFocus = false
 
     func focus() {
-        guard let textView, let window = textView.window else { return }
+        guard let textView, let window = textView.window else {
+            pendingFocus = true
+            return
+        }
+        pendingFocus = false
         window.makeFirstResponder(textView)
+    }
+}
+
+/// 输入框用的 NSTextView。进入窗口时，补上之前没做成的聚焦。
+final class ComposerNSTextView: NSTextView {
+    weak var handle: ComposerHandle?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window, let handle, handle.pendingFocus else { return }
+        handle.pendingFocus = false
+        window.makeFirstResponder(self)
     }
 }
 
@@ -29,7 +47,8 @@ struct ComposerTextView: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
-        let textView = NSTextView(usingTextLayoutManager: false)
+        let textView = ComposerNSTextView(usingTextLayoutManager: false)
+        textView.handle = handle
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.importsGraphics = false
