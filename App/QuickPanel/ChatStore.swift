@@ -26,7 +26,7 @@ final class ChatStore {
     private(set) var conversation: Conversation?
     private(set) var messages: [Message] = []
     private(set) var hasUnread = false
-    /// 发送前的问题（例如还没有 API key），显示在消息区底部。
+    /// 发送前的问题，显示在消息区底部。目前都和 API key 有关（没有 key、读不出 key），旁边给「打开设置」。
     private(set) var notice: String?
     private var turn: TurnHandle? {
         didSet {
@@ -48,6 +48,8 @@ final class ChatStore {
     @ObservationIgnored var openSettings: @MainActor () -> Void = {}
     /// 由 QuickPanelController 注入：「+」打开文件面板（面板失焦时不隐藏 Quick Panel）。
     @ObservationIgnored var presentFilePicker: @MainActor () -> Void = {}
+    /// 由菜单栏的视图注入：打开设置的 Connection 页并选中给定的 Connection（错误旁边的「打开设置」）。
+    @ObservationIgnored var openConnectionSettings: @MainActor (UUID) -> Void = { _ in }
     /// 由菜单栏的视图注入：打开 Main Window，并选中给定的 Conversation。
     @ObservationIgnored var openMainWindow: @MainActor (UUID?) -> Void = { _ in }
     /// 由 AppDelegate 注入：弹出 Quick Panel。
@@ -271,18 +273,9 @@ final class ChatStore {
     // MARK: - Turn
 
     func send() {
-        guard canSend, var conversation, let connection = connections.connection(id: conversation.connectionID) else { return }
-        let apiKey: String
-        do {
-            guard let key = try apiKeys.apiKey(for: connection.id) else {
-                notice = ChatError.authentication.displayText
-                return
-            }
-            apiKey = key
-        } catch {
-            notice = String(localized: "Couldn't read the API key from the Keychain.")
-            return
-        }
+        guard canSend, var conversation, let connection = connections.connection(id: conversation.connectionID),
+              let apiKey = readAPIKey(for: connection)
+        else { return }
 
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let attachments = takeDraftAttachments()
@@ -303,7 +296,7 @@ final class ChatStore {
         draft = ""
         notice = nil
 
-        let turn = runner.run(TurnInput(
+        start(TurnInput(
             conversation: conversation,
             connection: connection,
             apiKey: apiKey,
@@ -312,9 +305,73 @@ final class ChatStore {
             userMessage: userMessage,
             attachments: attachments
         ))
+    }
+
+    /// 最后一条回答是 Interrupted 或 Failed，并且没有在生成时，回答下面才显示操作按钮（SPEC §7）。
+    /// Retry 只能对最后一条使用（CONTEXT.md）。
+    var lastAnswerNeedsAction: Bool {
+        guard !isGenerating, messages.count >= 2, let last = messages.last, last.role == .assistant,
+              messages[messages.count - 2].role == .user
+        else { return false }
+        switch last.status {
+        case .interrupted, .failed: return true
+        case .streaming, .complete: return false
+        }
+    }
+
+    /// Retry：用同一条用户 Message 重新执行一次 Turn，新回答沿用旧回答的 id，落库时原地替换（CONTEXT.md）。
+    func retry() {
+        guard lastAnswerNeedsAction, let conversation,
+              let connection = connections.connection(id: conversation.connectionID),
+              let apiKey = readAPIKey(for: connection)
+        else { return }
+        let oldAnswer = messages[messages.count - 1]
+        let question = messages[messages.count - 2]
+        let history = Array(messages.dropLast(2))
+        // 旧回答先换成空的、生成中的回答，显示打字指示
+        messages[messages.count - 1] = Message(id: oldAnswer.id, role: .assistant, status: .streaming, content: [])
+        notice = nil
+
+        start(TurnInput(
+            conversation: conversation,
+            connection: connection,
+            apiKey: apiKey,
+            systemPrompt: SystemPrompt.forRequest(),
+            history: history,
+            userMessage: question,
+            attachments: question.attachmentIDs.compactMap { attachmentsByID[$0] },
+            replacingAnswerID: oldAnswer.id
+        ))
+    }
+
+    /// 错误旁边的「打开设置」：打开这个对话所用的 Connection。
+    func openSettingsForCurrentConnection() {
+        if let connectionID = conversation?.connectionID {
+            openConnectionSettings(connectionID)
+        } else {
+            openSettings()
+        }
+    }
+
+    /// 读出 Connection 的 API key。没有或者读不出来时，在消息区底部说明，旁边给「打开设置」。
+    private func readAPIKey(for connection: Connection) -> String? {
+        do {
+            guard let key = try apiKeys.apiKey(for: connection.id) else {
+                notice = ChatError.authentication.displayText
+                return nil
+            }
+            return key
+        } catch {
+            notice = String(localized: "Couldn't read the API key from the Keychain.")
+            return nil
+        }
+    }
+
+    private func start(_ input: TurnInput) {
+        let turn = runner.run(input)
         self.turn = turn
         let key = ObjectIdentifier(turn)
-        let conversationID = conversation.id
+        let conversationID = input.conversation.id
         let task = Task {
             await consume(turn, conversationID: conversationID)
             pendingTurns[key] = nil

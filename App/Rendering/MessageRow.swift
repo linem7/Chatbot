@@ -8,20 +8,28 @@ struct MessageRow: View {
     let message: Message
     /// 用户消息里引用的附件（按 `attachmentRef` 查好的）。
     let attachments: [Attachment]
+    /// 回答下面的操作按钮。只有 Quick Panel 里最后一条中断或出错的回答才有；Main Window 不给。
+    var actions: AnswerActionHandler?
 
     var body: some View {
         switch message.role {
         case .user:
             UserMessageBubble(text: message.markdownText, attachments: attachments)
         case .assistant:
-            AssistantMessageRow(message: message, presentation: AnswerPresentation(message))
+            AssistantMessageRow(message: message, presentation: AnswerPresentation(message), actions: actions)
         }
     }
+}
+
+/// 执行回答下面的操作按钮。
+struct AnswerActionHandler {
+    let perform: @MainActor (AnswerAction) -> Void
 }
 
 private struct AssistantMessageRow: View {
     let message: Message
     let presentation: AnswerPresentation
+    let actions: AnswerActionHandler?
 
     private var isStreaming: Bool { message.status == .streaming }
 
@@ -44,9 +52,9 @@ private struct AssistantMessageRow: View {
             }
             switch message.status {
             case .interrupted:
-                NoticeText(text: String(localized: "Interrupted"))
+                StatusNotice(text: String(localized: "Interrupted"), actions: message.status.actions, handler: actions)
             case .failed(let error):
-                NoticeText(text: error.displayText)
+                StatusNotice(text: error.displayText, actions: message.status.actions, handler: actions)
             case .streaming, .complete:
                 EmptyView()
             }
@@ -122,6 +130,44 @@ struct NoticeText: View {
             .font(.system(size: 12))
             .foregroundStyle(.orange)
             .textSelection(.enabled)
+    }
+}
+
+/// 中断或出错的说明，后面跟着对应的操作按钮（SPEC §7）。没有 handler 时只显示说明。
+private struct StatusNotice: View {
+    let text: String
+    let actions: [AnswerAction]
+    let handler: AnswerActionHandler?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            NoticeText(text: text)
+            if let handler {
+                ForEach(actions, id: \.self) { action in
+                    AnswerActionButton(action: action, isPrimary: action == actions.first) {
+                        handler.perform(action)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct AnswerActionButton: View {
+    let action: AnswerAction
+    let isPrimary: Bool
+    let perform: () -> Void
+
+    var body: some View {
+        Button(action: perform) {
+            switch action {
+            case .openSettings: Text("Open Settings")
+            case .retry: Text("Retry")
+            case .newConversation: Text("New Conversation")
+            }
+        }
+        .buttonStyle(.link)
+        .font(.system(size: 12, weight: isPrimary ? .semibold : .regular))
     }
 }
 

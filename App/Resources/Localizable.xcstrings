@@ -452,6 +452,16 @@
         }
       }
     },
+    "New Conversation": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新对话"
+          }
+        }
+      }
+    },
     "New Conversation (⌘N)": {
       "localizations": {
         "zh-Hans": {
@@ -528,6 +538,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开主窗口"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
           }
         }
       }
@@ -628,6 +648,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "恢复默认"
+          }
+        }
+      }
+    },
+    "Retry": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
           }
         }
       }

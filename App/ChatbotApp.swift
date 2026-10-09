@@ -74,6 +74,10 @@ private struct MenuBarLabel: View {
                     if !store.hasConnection { settingsNavigation.showConnections(template: .deepSeek) }
                     AppWindow.openSettings(with: openSettings)
                 }
+                store.openConnectionSettings = { [settingsNavigation] connectionID in
+                    settingsNavigation.showConnection(connectionID)
+                    AppWindow.openSettings(with: openSettings)
+                }
                 store.openMainWindow = { [history] conversationID in
                     history.select(conversationID)
                     AppWindow.openMainWindow(with: openWindow)
