@@ -26,11 +26,12 @@ project.yml
 App/                         # app target「Chatbot」：界面和系统集成
   ChatbotApp.swift           # @main：MenuBarExtra + Settings scene，LSUIElement = true
   AppDelegate.swift          # 通过 @NSApplicationDelegateAdaptor 持有 Hotkey、QuickPanel、定时任务
-  QuickPanel/                # NSPanel 子类、面板控制器、SwiftUI 视图（聊天窗式）
+  QuickPanel/                # NSPanel 子类、面板控制器、SwiftUI 视图（聊天窗式）、输入框（包装 NSTextView）
   MainWindow/                # 历史列表、搜索、Conversation 详情
   Settings/                  # 通用 / Connection / 高级三个标签页
   System/                    # Hotkey、Keychain、开机启动、剪贴板和拖拽的接入
   Rendering/                 # MarkdownUI 主题、代码高亮、Citation 角标、Gemini 搜索建议的 WebView
+  Resources/                 # Localizable.xcstrings：界面文案的 String Catalog，源语言英文，另有 zh-Hans
 Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测试。以下目录都在 Sources/ChatbotCore/ 下，测试在 Tests/ChatbotCoreTests/
   Domain/                    # Connection、Model、ModelCapabilities、Conversation、Message、ContentBlock、ChatError
   Providers/                 # SSE 解析器、三个 Provider adapter、请求编码和流解码
@@ -185,14 +186,17 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
 - **平台**：ImageIO 和 PDFKit 只在 Apple 平台上可用，用 `#if canImport` 隔开。相关测试只在 CI 上跑。
 
 ## 7. 系统集成
-- **Hotkey**：使用 KeyboardShortcuts（底层是 Carbon `RegisterEventHotKey`，不需要权限），默认 option+space。用 `isTakenBySystem` 检测冲突，冲突时提示。
+- **Hotkey**：使用 KeyboardShortcuts（底层是 Carbon `RegisterEventHotKey`，不需要权限），默认 option+space。用 `isTakenBySystem` 检测和系统快捷键的冲突，冲突时提示。其他 app 注册的同一组合检测不到（Carbon 的非独占注册不报错），只在设置里放一句静态提示。
 - **Quick Panel**：`NSPanel` 子类，主要配置如下：
   - `styleMask` 设为 `.nonactivatingPanel` + `.borderless`，并重写 `canBecomeKey = true`；
   - `level = .floating`，`collectionBehavior` 包括 `.canJoinAllSpaces`、`.fullScreenAuxiliary`、`.transient`、`.ignoresCycle`；
   - 内容用 `NSHostingView`；
-  - 在 `windowDidResignKey` 中执行 `orderOut`，用 `.onExitCommand` 处理 Esc；
+  - 在 `windowDidResignKey` 中执行 `orderOut`；
+  - 面板内的快捷键用本地 `NSEvent` monitor 按 keyCode 处理：Esc 隐藏面板，⌘. 停止生成，⌘N 新对话。不用 `.onExitCommand`，因为 AppKit 把 Esc 和 ⌘. 都映射为 `cancelOperation:`，没法区分；输入法正在组字时 Esc 交给输入法；
   - 按鼠标所在的屏幕定位。
+- **输入框**：用 `NSViewRepresentable` 包装 `NSTextView`，不用 SwiftUI 的 `TextEditor`。一是要在 `textView(_:doCommandBy:)` 里实现 ⏎ 发送、⇧⏎ 换行，输入法正在组字时 ⏎ 由输入法消费，不会误发送；二是面板显示时可以直接 `makeFirstResponder`，不依赖 `@FocusState`。面板不激活 app，⌘C、⌘V 等编辑命令由面板的 `performKeyEquivalent` 直接发给响应链。
 - **菜单栏**：使用 `MenuBarExtra`。图标的三种状态（空闲、生成中、有未读）由 store 驱动。
+- **界面文案**：用 String Catalog（`App/Resources/Localizable.xcstrings`），源语言英文，另加 zh-Hans，跟随系统语言。
 - **开机启动**：`SMAppService.mainApp`。
 - **Gemini 搜索建议**：在回答下方放一个小的 `WKWebView`，加载 `renderedContent`。
 

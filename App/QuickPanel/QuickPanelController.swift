@@ -1,0 +1,161 @@
+import AppKit
+import Carbon.HIToolbox
+import SwiftUI
+
+/// 持有 Quick Panel：配置窗口、显示和隐藏、处理面板里的快捷键（ARCHITECTURE §7，SPEC §2.2–§2.4）。
+///
+/// 隐藏只是 `orderOut`，不影响正在执行的 Turn。
+@MainActor
+final class QuickPanelController: NSObject, NSWindowDelegate {
+    private static let width: CGFloat = 680
+    private static let preferredHeight: CGFloat = 560
+    private static let maxScreenHeightFraction: CGFloat = 0.7
+    /// 面板顶边距屏幕顶边的比例，对应原型的「偏上居中」。
+    private static let topOffsetFraction: CGFloat = 0.16
+    private static let cornerRadius: CGFloat = 22
+
+    private let store: ChatStore
+    private let composer = ComposerHandle()
+    private let panel: QuickPanel
+    private var isShown = false
+    private var keyMonitor: Any?
+
+    init(store: ChatStore) {
+        self.store = store
+        panel = QuickPanel(
+            contentRect: NSRect(x: 0, y: 0, width: Self.width, height: Self.preferredHeight),
+            styleMask: [.nonactivatingPanel, .borderless, .fullSizeContentView],
+            backing: .buffered,
+            defer: true
+        )
+        super.init()
+
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.isMovable = false
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.hasShadow = true
+        panel.delegate = self
+        panel.contentView = makeContentView()
+    }
+
+    func toggle() {
+        if isShown { hide() } else { show() }
+    }
+
+    func show() {
+        guard !isShown else { return }
+        isShown = true
+        store.panelWillShow()
+        positionOnMouseScreen()
+        panel.makeKeyAndOrderFront(nil)
+        panel.contentView?.layoutSubtreeIfNeeded()
+        composer.focus()
+        installKeyMonitor()
+    }
+
+    /// 再按一次 Hotkey、按 Esc、失焦时调用。只隐藏，不停止生成。
+    func hide() {
+        guard isShown else { return }
+        isShown = false
+        removeKeyMonitor()
+        panel.orderOut(nil)
+        store.panelDidHide()
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        hide()
+    }
+
+    // MARK: - 布局
+
+    private func makeContentView() -> NSView {
+        let frame = NSRect(x: 0, y: 0, width: Self.width, height: Self.preferredHeight)
+        let background = NSVisualEffectView(frame: frame)
+        background.material = .popover
+        background.blendingMode = .behindWindow
+        background.state = .active
+        background.maskImage = .roundedRectMask(cornerRadius: Self.cornerRadius)
+
+        let hosting = NSHostingView(rootView: QuickPanelView(store: store, composer: composer))
+        hosting.sizingOptions = []
+        hosting.frame = background.bounds
+        hosting.autoresizingMask = [.width, .height]
+        background.addSubview(hosting)
+        return background
+    }
+
+    /// 出现在鼠标所在屏幕的偏上居中位置。高度约 560pt，最多占可见区域的 70%。
+    private func positionOnMouseScreen() {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main else {
+            return
+        }
+        let visible = screen.visibleFrame
+        let width = min(Self.width, visible.width - 32)
+        let height = min(Self.preferredHeight, visible.height * Self.maxScreenHeightFraction)
+        let top = min(screen.frame.maxY - screen.frame.height * Self.topOffsetFraction, visible.maxY)
+        let originY = max(visible.minY, top - height)
+        panel.setFrame(NSRect(x: visible.midX - width / 2, y: originY, width: width, height: height), display: false)
+    }
+
+    // MARK: - 快捷键
+
+    /// AppKit 把 Esc 和 ⌘. 都当作 `cancelOperation:`，所以不用 `.onExitCommand`，
+    /// 而是在这里按 keyCode 区分：Esc 隐藏面板，⌘. 停止生成（SPEC §2.4）。
+    private func installKeyMonitor() {
+        guard keyMonitor == nil else { return }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self, self.handleKeyDown(event) else { return event }
+            return nil
+        }
+    }
+
+    private func removeKeyMonitor() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+    }
+
+    private func handleKeyDown(_ event: NSEvent) -> Bool {
+        guard event.window === panel else { return false }
+        let modifiers = event.modifierFlags.intersection([.command, .shift, .option, .control])
+
+        if event.keyCode == UInt16(kVK_Escape), modifiers.isEmpty {
+            // 输入法正在组字时，Esc 交给输入法取消组字。
+            if (panel.firstResponder as? NSTextView)?.hasMarkedText() == true { return false }
+            hide()
+            return true
+        }
+
+        guard modifiers == .command else { return false }
+        switch event.charactersIgnoringModifiers {
+        case ".":
+            store.stop()
+            return true
+        case "n":
+            store.newConversation()
+            composer.focus()
+            return true
+        default:
+            return false
+        }
+    }
+}
+
+private extension NSImage {
+    /// `NSVisualEffectView.maskImage` 用的圆角矩形，可以拉伸到任意尺寸。
+    static func roundedRectMask(cornerRadius: CGFloat) -> NSImage {
+        let edge = cornerRadius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: cornerRadius, yRadius: cornerRadius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: cornerRadius, left: cornerRadius, bottom: cornerRadius, right: cornerRadius)
+        image.resizingMode = .stretch
+        return image
+    }
+}

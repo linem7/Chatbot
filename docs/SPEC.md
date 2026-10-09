@@ -20,7 +20,8 @@
 ### 2.1 Hotkey
 - 默认 **option+space**，可以在设置里修改。
 - 不需要任何系统权限。
-- 首次启动和改键时会检测冲突，如果和系统或其他 app 的快捷键冲突，会给出提示。注意 ChatGPT 桌面版默认也用 option+space。
+- 首次启动和改键时检测和**系统快捷键**的冲突，冲突时给出提示。
+- 和其他 app 的冲突检测不到（ChatGPT 桌面版默认也用 option+space），只在设置里 Hotkey 旁边放一句静态提示：按了没反应时，可能和 ChatGPT 等 app 冲突，请换一个组合。
 
 ### 2.2 外观（以 #15 原型的「聊天窗式」为准）
 原型：https://linem7.github.io/Chatbot/ （源在 `gh-pages` 分支）
@@ -57,7 +58,7 @@
 |---|---|
 | ⏎ | 发送（输入法正在组字时不发送） |
 | ⇧⏎ | 换行 |
-| ⌘N | 新对话 |
+| ⌘N | 新对话。正在生成时，先停止当前回答（保留为 Interrupted），再新开 |
 | ⌘. | 停止生成 |
 | Esc | 隐藏面板 |
 
@@ -66,7 +67,7 @@
 - **Conversation 创建时选定 Model，之后不能再换。** 新 Conversation 默认使用 Default Model。
 - 模型选择器：
   - Conversation 还没有消息时，切换会直接改掉它的 Model；
-  - 已经有消息时，切换的结果是用新 Model **开一个新 Conversation**。
+  - 已经有消息时，切换的结果是用新 Model **开一个新 Conversation**。如果正在生成，和 ⌘N 一样先停止当前回答（保留为 Interrupted），再新开。
 - 模型选择器按 Connection 分组列出 Model，并标注能力（图片、联网）。
 - **不开模型思考，也不展示推理过程**（ADR-0002）。
 - **Retry**：只有最后一条回答处于 Interrupted 或出错状态时才能重试，新回答会替换旧的。没有「重新生成任意一条」，也不能编辑旧消息。
