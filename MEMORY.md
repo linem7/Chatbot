@@ -23,11 +23,12 @@
 - #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。原型在 `prototype/quick-panel` 分支上，不进 main。
 - #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
-- 仓库是私有的，所以 v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查；CI 只在 PR 时跑构建和测试（私有仓库的 macOS runner 按 10 倍消耗免费额度）。
+- v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
+- 2026-10-09 应用户要求，仓库最终改为 **public**，这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。
 - 实现 ticket 按 ARCHITECTURE §9 的顺序创建，都带 `v1` label。下一步从「实现 1：工程骨架」开始。
-- 仓库在 2026-10-09 曾短暂改成 public 来开 GitHub Pages，同一天又应用户要求改回了 **private**。免费账号的私有仓库没有 Pages，原来的 Pages 链接已经失效。
+- 仓库可见性在 2026-10-09 来回改过几次，最终是 **public**。GitHub Pages 在仓库改回私有时被撤下了，之后没有重新开启。
 
 ## 偏好补充
 
-- 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。仓库是私有的，所以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ）。修改仓库可见性前要先问用户。
+- 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。可以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ），也可以在征得用户同意后用 GitHub Pages。修改仓库可见性前要先问用户。
 - **当前这台机器是 Linux**，没法构建和运行 Swift/macOS app。用户在 Mac 上开发，CI 用 macOS runner。在这里只能写代码、写文档，要说明代码没有经过编译验证。

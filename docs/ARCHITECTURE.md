@@ -15,7 +15,7 @@
 | 不引入 | 任何 LLM SDK、SSE 库、Sparkle 等更新框架 |
 | bundle id | `com.linem7.Chatbot` |
 | 签名 | 本机构建时用一张固定的自签名证书，不做公证（ADR-0005） |
-| CI | GitHub Actions macOS runner，只在 PR 时构建并跑测试。私有仓库的 macOS runner 按 10 倍消耗免费额度，所以 push 到 main 时不跑。CI 不签名，也不发布 |
+| CI | GitHub Actions macOS runner，push 到 main 和 PR 时都构建并跑测试。仓库是公开的，标准 runner 不收费。CI 不签名，也不发布 |
 | 分发 | v1 只自用：在本机构建后安装。不发 GitHub Release，也不做更新检查 |
 | 日志 | 只用 `os.Logger`，不记录 key 和对话内容，不做远程上报 |
 
@@ -169,7 +169,7 @@ message_fts(FTS5，索引 conversation.title 和 message.plainText)
 
 ## 9. 建议的实现顺序（用来拆分实现 ticket）
 
-1. **工程骨架**：`project.yml`、App 和 ChatbotCore、PR 时的 CI 构建测试、本机自签名配置。
+1. **工程骨架**：`project.yml`、App 和 ChatbotCore、CI 构建测试、本机自签名配置。
 2. **核心链路**：Domain → SSE 解析器 → OpenAI 兼容 adapter（DeepSeek）→ TurnRunner。用 fixture 测试。
 3. **最小可用版本**：菜单栏 + Hotkey + Quick Panel（聊天窗式）+ 流式回答 + Markdown 渲染。Connection 设置先只支持 DeepSeek。
 4. **存储**：GRDB 历史、标题生成、30 天清理、Main Window 的列表和全文搜索。
