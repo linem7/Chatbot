@@ -77,6 +77,8 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     private func restorePreviousFrontmostApp() {
         guard let app = previousFrontmostApp else { return }
         previousFrontmostApp = nil
+        // 用户已经自己切到别的 app 了，就不要再把焦点抢回去
+        guard NSApp.isActive else { return }
         let hasOtherVisibleWindow = NSApp.windows.contains { $0 !== panel && $0.isVisible && $0.canBecomeMain }
         guard !hasOtherVisibleWindow, !app.isTerminated else { return }
         NSApp.yieldActivation(to: app)

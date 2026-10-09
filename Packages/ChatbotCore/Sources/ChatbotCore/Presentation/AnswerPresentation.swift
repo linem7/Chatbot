@@ -59,11 +59,11 @@ public struct AnswerPresentation: Equatable, Sendable {
                 var markers: [Int: [Int]] = [:]
                 for span in citations {
                     let n = number(for: span.citation)
-                    guard let range = span.textRange, range.upperBound <= text.utf16.count,
-                          !Self.isInsideCodeBlock(text, utf16Offset: range.upperBound)
-                    else { continue }
-                    if markers[range.upperBound, default: []].contains(n) == false {
-                        markers[range.upperBound, default: []].append(n)
+                    guard let range = span.textRange, range.upperBound <= text.utf16.count else { continue }
+                    let offset = Self.markerOffset(for: range, in: text)
+                    guard !Self.isInsideCode(text, utf16Offset: offset) else { continue }
+                    if markers[offset, default: []].contains(n) == false {
+                        markers[offset, default: []].append(n)
                     }
                 }
                 markdown += Self.insert(markers, into: text, sources: sources)
@@ -103,12 +103,36 @@ public struct AnswerPresentation: Equatable, Sendable {
         return result
     }
 
-    /// 偏移处是不是在 ``` 代码块里面：之前出现过奇数个代码块分隔行就是在里面。代码块里不插角标。
-    private static func isInsideCodeBlock(_ text: String, utf16Offset: Int) -> Bool {
+    /// 角标的位置：引用范围的结尾，但跳过末尾的空白和换行。范围以换行结尾时，
+    /// 角标如果插在下一行行首，会破坏「## 标题」「- 列表项」这类行首语法。
+    private static func markerOffset(for range: Range<Int>, in text: String) -> Int {
+        let utf16 = Array(text.utf16)
+        var offset = range.upperBound
+        while offset > range.lowerBound, let scalar = Unicode.Scalar(utf16[offset - 1]),
+              scalar.properties.isWhitespace {
+            offset -= 1
+        }
+        return offset
+    }
+
+    /// 偏移处是不是在代码里：代码块（``` 或 ~~~ 围栏）或者行内代码（同一行前面有奇数个反引号）。代码里不插角标。
+    private static func isInsideCode(_ text: String, utf16Offset: Int) -> Bool {
         let prefix = String(text.utf16.prefix(utf16Offset)) ?? ""
-        let fences = prefix.split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { $0.trimmingCharacters(in: .whitespaces).hasPrefix("```") }
-        return fences.count % 2 == 1
+        var lines = prefix.split(separator: "\n", omittingEmptySubsequences: false)
+        let currentLine = lines.popLast() ?? ""
+
+        // 围栏：开头是 ``` 或 ~~~，要用同一种字符结束
+        var openFence: Character?
+        for line in lines + [currentLine] {
+            let trimmed = line.drop { $0 == " " }
+            guard let first = trimmed.first, first == "`" || first == "~", trimmed.prefix(3).allSatisfy({ $0 == first }),
+                  trimmed.count >= 3
+            else { continue }
+            if openFence == nil { openFence = first } else if openFence == first { openFence = nil }
+        }
+        if openFence != nil { return true }
+
+        return currentLine.filter { $0 == "`" }.count % 2 == 1
     }
 
     /// 来源旁边显示的域名。Gemini 的来源链接都是 vertexaisearch 的跳转地址，这时标题本身就是网站的域名。

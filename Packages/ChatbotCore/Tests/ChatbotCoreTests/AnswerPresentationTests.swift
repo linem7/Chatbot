@@ -54,6 +54,33 @@ struct AnswerPresentationTests {
         #expect(presentation.sources.count == 1)
     }
 
+    @Test func markersStayOnTheCitedLineWhenTheRangeEndsWithANewline() {
+        // 范围以换行结尾时，角标要插在换行之前，不能落到下一行行首、破坏「## 标题」「- 列表项」这类语法
+        let text = "第一段的结论。\n\n## 下一节\n- 列表项"
+        let cited = "第一段的结论。\n\n"
+        let presentation = answer([ContentBlock(.text(text, citations: [CitationSpan(citation: wiki, textRange: 0..<cited.utf16.count)]))])
+        #expect(presentation.markdown == "第一段的结论。[\\[1\\]](<https://en.wikipedia.org/wiki/Claude_Shannon>)\n\n## 下一节\n- 列表项")
+    }
+
+    @Test(arguments: [
+        // ~~~ 围栏
+        ("看代码：\n~~~\nlet x = 1\n~~~\n结束", "let x = 1"),
+        // 行内代码
+        ("运行 `swift build` 就行", "swift build"),
+    ])
+    func noMarkerInsideTildeFencesOrInlineCode(text: String, citedEnd: String) {
+        let end = text.range(of: citedEnd)!.upperBound.utf16Offset(in: text)
+        let presentation = answer([ContentBlock(.text(text, citations: [CitationSpan(citation: wiki, textRange: 0..<end)]))])
+        #expect(presentation.markdown == text)
+        #expect(presentation.sources.count == 1)
+    }
+
+    @Test func markersAfterClosedInlineCodeAreFine() {
+        let text = "运行 `swift build` 就行。"
+        let presentation = answer([ContentBlock(.text(text, citations: [CitationSpan(citation: wiki, textRange: 0..<text.utf16.count)]))])
+        #expect(presentation.markdown == text + "[\\[1\\]](<https://en.wikipedia.org/wiki/Claude_Shannon>)")
+    }
+
     @Test func markersGoIntoTheirOwnTextBlocksAndTheCopyTextStaysOriginal() {
         let presentation = answer([
             ContentBlock(.text("先说一句。")),

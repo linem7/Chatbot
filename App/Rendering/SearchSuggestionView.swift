@@ -5,7 +5,8 @@ import WebKit
 /// Gemini 的「搜索建议」组件（`searchEntryPoint.renderedContent`）。按 Google 的条款，必须在回答下方原样展示（SPEC §5）。
 ///
 /// - 内容是 Google 给的 HTML 和 CSS，自己带深浅色样式，所以用 WKWebView 原样渲染，背景透明。
-/// - 高度跟随内容：页面加载完后读 `scrollHeight`，不在消息里出现第二个滚动区域。
+/// - 高度跟随内容：页面里的 ResizeObserver 在 body 尺寸变化时把高度报回来（Main Window 宽度可变，
+///   变宽变窄都会重新计算），不在消息里出现第二个滚动区域。
 /// - 点里面的链接（搜索建议的 chip）用默认浏览器打开，不在 WebView 里跳转。
 struct SearchSuggestionView: View {
     let html: String
@@ -29,6 +30,17 @@ private struct SuggestionWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
+        // body 的尺寸一变（包括宽度变化导致的换行），就把内容高度报给原生侧
+        configuration.userContentController.add(context.coordinator, name: Coordinator.heightMessage)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: """
+                new ResizeObserver(() => {
+                  window.webkit.messageHandlers.\(Coordinator.heightMessage).postMessage(Math.ceil(document.body.getBoundingClientRect().height));
+                }).observe(document.body);
+                """,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        ))
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
@@ -44,8 +56,14 @@ private struct SuggestionWebView: NSViewRepresentable {
         context.coordinator.load(html, in: webView)
     }
 
+    static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        // userContentController 会强引用 message handler，拆掉时解开
+        webView.configuration.userContentController.removeScriptMessageHandler(forName: Coordinator.heightMessage)
+    }
+
     @MainActor
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
+        static let heightMessage = "suggestionHeight"
         var height: Binding<CGFloat>
         private var loadedHTML: String?
 
@@ -62,13 +80,24 @@ private struct SuggestionWebView: NSViewRepresentable {
             webView.loadHTMLString(page, baseURL: nil)
         }
 
+        func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let value = (message.body as? NSNumber)?.doubleValue else { return }
+            setHeight(value)
+        }
+
+        /// 加载完再量一次，防止 ResizeObserver 的第一次回调来得太早。
+        /// 用 body 的实际高度，不用 documentElement.scrollHeight：后者不会小于视口高度，变宽之后缩不回来。
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            webView.evaluateJavaScript("document.documentElement.scrollHeight") { [weak self] result, _ in
-                guard let value = (result as? NSNumber)?.doubleValue, value > 0 else { return }
-                MainActor.assumeIsolated {
-                    self?.height.wrappedValue = CGFloat(value)
-                }
+            webView.evaluateJavaScript("Math.ceil(document.body.getBoundingClientRect().height)") { [weak self] result, _ in
+                guard let value = (result as? NSNumber)?.doubleValue else { return }
+                MainActor.assumeIsolated { self?.setHeight(value) }
             }
+        }
+
+        private func setHeight(_ value: Double) {
+            let newHeight = CGFloat(value)
+            guard newHeight > 0, abs(newHeight - height.wrappedValue) >= 1 else { return }
+            height.wrappedValue = newHeight
         }
 
         /// 链接一律交给默认浏览器；只允许加载我们自己给的这一页。
