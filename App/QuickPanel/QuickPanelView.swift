@@ -54,6 +54,15 @@ private struct QuickPanelHeader: View {
             }
             .buttonStyle(.borderless)
             .help("New Conversation (⌘N)")
+            Button {
+                store.openInMainWindow()
+            } label: {
+                Image(systemName: "macwindow")
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.borderless)
+            .help("Open in Main Window")
+            .disabled(!store.canOpenInMainWindow)
         }
         .frame(maxWidth: .infinity)
         .overlay {
@@ -136,56 +145,6 @@ private struct MessageList: View {
         }
         .defaultScrollAnchor(.bottom)
         .defaultScrollAnchor(.bottom, for: .sizeChanges)
-    }
-}
-
-private struct MessageRow: View {
-    let message: Message
-    let attachments: [Attachment]
-
-    var body: some View {
-        switch message.role {
-        case .user:
-            UserMessageBubble(text: message.markdownText, attachments: attachments)
-        case .assistant:
-            VStack(alignment: .leading, spacing: 6) {
-                if message.status == .streaming && message.content.isEmpty {
-                    TypingIndicator()
-                } else {
-                    AssistantMessageView(markdown: message.markdownText, isStreaming: message.status == .streaming)
-                        .equatable()
-                }
-                switch message.status {
-                case .interrupted:
-                    NoticeText(text: String(localized: "Interrupted"))
-                case .failed(let error):
-                    NoticeText(text: error.displayText)
-                case .streaming, .complete:
-                    EmptyView()
-                }
-            }
-        }
-    }
-}
-
-private struct NoticeText: View {
-    let text: String
-
-    var body: some View {
-        Text(verbatim: text)
-            .font(.system(size: 12))
-            .foregroundStyle(.orange)
-            .textSelection(.enabled)
-    }
-}
-
-private struct TypingIndicator: View {
-    var body: some View {
-        Image(systemName: "ellipsis")
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(.tertiary)
-            .symbolEffect(.variableColor.iterative)
-            .padding(.vertical, 4)
     }
 }
 

@@ -51,6 +51,26 @@
         }
       }
     },
+    "Chatbot": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Chatbot"
+          }
+        }
+      }
+    },
+    "Continue in Quick Panel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Quick Panel 中继续"
+          }
+        }
+      }
+    },
     "Copied": {
       "localizations": {
         "zh-Hans": {
@@ -121,6 +141,16 @@
         }
       }
     },
+    "Delete": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除"
+          }
+        }
+      }
+    },
     "Hotkey %@ is used by macOS": {
       "localizations": {
         "zh-Hans": {
@@ -167,6 +197,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "新对话（⌘N）"
+          }
+        }
+      }
+    },
+    "No Conversation Selected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有选中对话"
+          }
+        }
+      }
+    },
+    "No Conversations": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有对话"
+          }
+        }
+      }
+    },
+    "Open Main Window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开主窗口"
+          }
+        }
+      }
+    },
+    "Open in Main Window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在主窗口中打开"
           }
         }
       }
@@ -327,6 +397,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求太频繁或额度已用完，请 %lld 秒后再试。"
+          }
+        }
+      }
+    },
+    "Untitled": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名"
           }
         }
       }
