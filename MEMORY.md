@@ -59,6 +59,7 @@
 - 2026-10-10：**#67 以 not planned 关闭**（用户决定）。代码没改过——`AppWindow.openSettings` 仍是 `NSApp.activate()` 后立刻 `openSettings()`、100ms 后 `orderFrontRegardless()` + `makeKey()`；用户判断窗口按钮和 Toggle 画成非激活样式只是视觉问题、不影响使用，v1.0.0 不修。结论已追加到 #1。**至此所有 issue 都关掉了。**
 - 2026-10-10：两件悬着的事情，用户决定**都不动**——v1.1 那批（#46–#54）的结论只有 #45 地图里有、不搬进 #1；CI 保持 push 到 main 和 PR 都跑，不改成只在 PR 时跑。
 - 2026-10-10：本地 `main` 已跟到 `27bca41`（「发布 v1.0.0：安装包脚本与安装指引」，另一个会话推的：新增 `docs/INSTALL.md`、`docs/releases/v1.0.0.md`、`scripts/package-release.sh`，版本号改成 1.0.0，并把「v1 只自用、不发 Release」的决定改成发布给朋友手动安装）。
+- 2026-10-10：#68（Web Search 默认关闭）完成，PR #69 已合（用户真机测过）。决策（用户已确认）：每个新 Conversation 都从关开始、不记住上一次；Settings › General 加「新对话默认联网」开关（默认关）。
 
 ## 偏好补充
 

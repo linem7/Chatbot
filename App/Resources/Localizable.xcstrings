@@ -582,6 +582,16 @@
         }
       }
     },
+    "Only for models that can search. The globe button still turns it on or off for the current conversation.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只对能联网的模型有效。地球按钮仍然可以对当前对话打开或关闭联网。"
+          }
+        }
+      }
+    },
     "Open Accessibility": {
       "localizations": {
         "zh-Hans": {
@@ -788,6 +798,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "保存时会拉取 Model 列表，这一步同时就是连接测试。"
+          }
+        }
+      }
+    },
+    "Search the Web in New Conversations": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新对话默认联网"
           }
         }
       }

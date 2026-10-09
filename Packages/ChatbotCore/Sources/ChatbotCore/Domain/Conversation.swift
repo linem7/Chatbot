@@ -18,7 +18,7 @@ public struct Conversation: Codable, Sendable, Hashable, Identifiable {
         titleIsGenerated: Bool = false,
         connectionID: UUID,
         modelID: String,
-        webSearchEnabled: Bool = true,
+        webSearchEnabled: Bool = false,
         createdAt: Date = Date(),
         lastMessageAt: Date? = nil
     ) {
