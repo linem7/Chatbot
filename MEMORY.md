@@ -20,5 +20,11 @@
 - #12（本地历史）已关闭：用 GRDB 存储（ADR-0004），30 天静默清理，标题由模型生成，支持全文搜索，永远不做导出。
 - #13（设置）已关闭：key 存 Keychain，设置是独立窗口，分三个标签页；去掉了「手动覆盖 Model Capabilities」（修改了 #7 的结论，已在 #7 补充说明）；界面做中英文，跟随系统。
 - #14（工程基线）已关闭：最低支持 macOS 26；工程用 XcodeGen 生成；分层是 App target 加本地 SPM 包 ChatbotCore；用自签名证书签名、不做公证（ADR-0005）；CI 负责构建、测试和按 tag 发布；更新只做「有新版本」提示；日志只用 os.Logger；Swift 6 + Swift Testing；bundle id 是 com.linem7.Chatbot。
-- 下一个 ticket 是 #15（Quick Panel UI 原型）。
+- #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。原型在 `prototype/quick-panel` 分支上，不进 main。
+- 下一个 ticket 是 #16（汇总写 SPEC.md、ARCHITECTURE.md，更新 README）。#1 里还剩三项 Not yet specified：Markdown 渲染、上下文截断、错误提示方式。
+- 仓库在 2026-10-09 应用户要求改成了 **public**。GitHub Pages 从 `prototype/quick-panel` 分支发布：https://linem7.github.io/Chatbot/
+
+## 偏好补充
+
+- 给用户看的网页、原型，**直接部署到 GitHub Pages 并给出可以点开的链接**。不要让用户下载文件或切分支再看。
 - **当前这台机器是 Linux**，没法构建和运行 Swift/macOS app。用户在 Mac 上开发，CI 用 macOS runner。在这里只能写代码、写文档，要说明代码没有经过编译验证。
