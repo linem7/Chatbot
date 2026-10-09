@@ -5,6 +5,7 @@ import SwiftUI
 /// 持有 Quick Panel：配置窗口、显示和隐藏、处理面板里的快捷键（ARCHITECTURE §7，SPEC §2.2–§2.4）。
 ///
 /// 隐藏只是 `orderOut`，不影响正在执行的 Turn。
+@MainActor
 final class QuickPanelController: NSObject, NSWindowDelegate {
     private static let width: CGFloat = 680
     private static let preferredHeight: CGFloat = 560
