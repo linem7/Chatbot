@@ -1,88 +1,139 @@
 import ChatbotCore
+import KeyboardShortcuts
 import SwiftUI
 
-/// 设置窗口。#19 先只支持一个 DeepSeek Connection；三个标签页在 #22 里做。
+/// 设置窗口，三个标签页：通用、Connection、高级（SPEC §9）。
 struct SettingsView: View {
-    let store: ChatStore
+    let chat: ChatStore
+    let history: HistoryModel
+    @Bindable var navigation: SettingsNavigation
+    let launchAtLogin: LaunchAtLogin
+
+    var body: some View {
+        TabView(selection: $navigation.tab) {
+            Tab("General", systemImage: "gearshape", value: SettingsTab.general) {
+                GeneralSettingsView(connections: chat.connections, launchAtLogin: launchAtLogin)
+            }
+            Tab("Connections", systemImage: "network", value: SettingsTab.connections) {
+                ConnectionsSettingsView(chat: chat, history: history, navigation: navigation)
+            }
+            Tab("Advanced", systemImage: "slider.horizontal.3", value: SettingsTab.advanced) {
+                AdvancedSettingsView(history: history)
+            }
+        }
+        .frame(width: 680, height: 500)
+    }
+}
+
+// MARK: - 通用
+
+private struct GeneralSettingsView: View {
+    @Bindable var connections: ConnectionStore
+    let launchAtLogin: LaunchAtLogin
 
     var body: some View {
         Form {
-            DeepSeekConnectionSection(store: store)
-            DefaultModelSection(connections: store.connections)
-        }
-        .formStyle(.grouped)
-        .frame(width: 460)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-private struct DeepSeekConnectionSection: View {
-    let store: ChatStore
-    @State private var apiKey = ""
-    @State private var isSaving = false
-    @State private var errorMessage: String?
-
-    private var connection: Connection? {
-        store.connections.connections.first { $0.provider == .openAICompatible && $0.baseURL == Connection.deepSeek().baseURL }
-    }
-
-    var body: some View {
-        Section("DeepSeek") {
-            SecureField("API Key", text: $apiKey, prompt: Text(connection == nil ? LocalizedStringKey("sk-…") : "Saved — paste a new key to replace it"))
-            HStack {
-                if let connection {
-                    Text("\(connection.models.count) models available")
-                        .foregroundStyle(.secondary)
+            Section {
+                // 改键时和系统快捷键冲突，Recorder 自己会提示（SPEC §2.1）
+                LabeledContent("Hotkey") {
+                    KeyboardShortcuts.Recorder(for: .toggleQuickPanel)
                 }
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                }
-                Spacer()
-                if isSaving { ProgressView().controlSize(.small) }
-                Button("Save") { Task { await save() } }
-                    .disabled(apiKey.trimmingCharacters(in: .whitespaces).isEmpty || isSaving)
+                Text(Hotkey.otherAppsHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-        }
-    }
 
-    /// 保存时拉取 Model 列表，这一步同时就是连接测试（SPEC §9）。成功后才写入 Keychain。
-    private func save() async {
-        let key = apiKey.trimmingCharacters(in: .whitespaces)
-        var connection = connection ?? Connection.deepSeek()
-        isSaving = true
-        errorMessage = nil
-        defer { isSaving = false }
-        do {
-            connection.models = try await connection.provider.makeAdapter().listModels(connection, apiKey: key)
-            try store.apiKeys.setAPIKey(key, for: connection.id)
-            store.connections.save(connection)
-            store.connectionsDidChange()
-            apiKey = ""
-        } catch let error as ChatError {
-            errorMessage = error.displayText
-        } catch is KeychainError {
-            errorMessage = String(localized: "Couldn't save the API key to the Keychain.")
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-}
+            Section {
+                Picker("Default Model", selection: $connections.defaultModel) {
+                    Text("None").tag(ModelRef?.none)
+                    ForEach(connections.connections) { connection in
+                        ForEach(connections.visibleModels(of: connection)) { model in
+                            Text(verbatim: "\(connection.name) / \(model.displayName ?? model.id)")
+                                .tag(Optional(ModelRef(connectionID: connection.id, modelID: model.id)))
+                        }
+                    }
+                }
+                .disabled(connections.connections.isEmpty)
+                if connections.defaultModel == nil, !connections.connections.isEmpty {
+                    // Default Model 所在的 Connection 被删掉之后，要求用户重新选（SPEC §9）
+                    Text("Choose a Default Model for new conversations.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
 
-private struct DefaultModelSection: View {
-    @Bindable var connections: ConnectionStore
-
-    var body: some View {
-        Section("Default Model") {
-            Picker("Default Model", selection: $connections.defaultModel) {
-                ForEach(connections.connections) { connection in
-                    ForEach(connections.visibleModels(of: connection)) { model in
-                        Text(verbatim: "\(connection.name) / \(model.displayName ?? model.id)")
-                            .tag(Optional(ModelRef(connectionID: connection.id, modelID: model.id)))
+            Section {
+                Toggle("Launch at Login", isOn: Binding(
+                    get: { launchAtLogin.isEnabled || launchAtLogin.requiresApproval },
+                    set: { launchAtLogin.setEnabled($0) }
+                ))
+                if launchAtLogin.requiresApproval {
+                    HStack {
+                        Text("Allow Chatbot in System Settings › General › Login Items.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Open Login Items") { launchAtLogin.openSystemSettings() }
                     }
                 }
             }
-            .disabled(connections.connections.isEmpty)
+        }
+        .formStyle(.grouped)
+        .onAppear { launchAtLogin.refresh() }
+    }
+}
+
+// MARK: - 高级
+
+private struct AdvancedSettingsView: View {
+    let history: HistoryModel
+    @AppStorage(SystemPrompt.defaultsKey) private var systemPrompt = SystemPrompt.defaultText
+    @State private var isConfirmingClear = false
+    @State private var isClearing = false
+
+    var body: some View {
+        Form {
+            Section("System Prompt") {
+                TextEditor(text: $systemPrompt)
+                    .font(.body)
+                    .frame(minHeight: 160)
+                HStack {
+                    Text("Today's date is added at the start automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Restore Default") { systemPrompt = SystemPrompt.defaultText }
+                        .disabled(systemPrompt == SystemPrompt.defaultText)
+                }
+            }
+
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Clear All History")
+                        Text("Deletes every conversation and its attachments.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if isClearing { ProgressView().controlSize(.small) }
+                    Button("Clear…", role: .destructive) { isConfirmingClear = true }
+                        .disabled(isClearing)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        // 清空全部历史要二次确认（SPEC §9）
+        .confirmationDialog("Clear all history?", isPresented: $isConfirmingClear) {
+            Button("Clear All History", role: .destructive) {
+                isClearing = true
+                Task {
+                    await history.deleteAll()
+                    isClearing = false
+                }
+            }
+        } message: {
+            Text("All conversations and their attachments will be deleted. This can't be undone.")
         }
     }
 }

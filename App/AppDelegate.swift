@@ -12,6 +12,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var history = Self.openHistory()
     private(set) lazy var chatStore = ChatStore(history: history)
     private(set) lazy var historyModel = HistoryModel(store: history, chat: chatStore)
+    private(set) lazy var settingsNavigation = SettingsNavigation()
+    private(set) lazy var launchAtLogin = LaunchAtLogin()
     private var quickPanel: QuickPanelController?
     private var cleanup: Task<Void, Never>?
 
@@ -25,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             quickPanel?.show()
         }
         Hotkey.warnIfTakenBySystem()
+        // 开机启动默认开启（SPEC §9）
+        if settingsNavigation.isFirstLaunch { launchAtLogin.setEnabled(true) }
 
         // 启动时清理一次，之后每 24 小时一次（SPEC §8）。删掉了东西就让 Main Window 刷新。
         let history = history

@@ -71,9 +71,11 @@
 - 模型选择器按 Connection 分组列出 Model，并标注能力（图片、联网）。
 - **不开模型思考，也不展示推理过程**（ADR-0002）。
 - **Retry**：只有最后一条回答处于 Interrupted 或出错状态时才能重试，新回答会替换旧的。没有「重新生成任意一条」，也不能编辑旧消息。
-- system prompt：由 app 内置一份默认的，用户可以在设置里全局修改，也可以恢复默认。默认内容包括当前日期，并要求模型：
+- system prompt：由 app 内置一份默认的，用户可以在设置里全局修改，也可以恢复默认。默认内容要求模型：
   - 拿不准就明确说没查到或不确定，不要编造；
   - 联网搜索时引用来源。
+
+  当前日期不在可编辑的文本里：发送时由 app 在 system prompt 最前面加一行当前日期，所以用户改了 prompt 也不会把日期弄丢。
 
 ## 4. Attachment（附件）
 
@@ -155,7 +157,7 @@
 
 **Connection**
 - 增加、编辑、删除 Connection。
-- 添加时先选模板：DeepSeek / Anthropic / Gemini / OpenAI / 自定义。模板会自动填好 Provider 和 base URL，用户只需要粘贴 API key。
+- 添加时先选模板：DeepSeek / Anthropic / Gemini / OpenAI / 自定义。模板会自动填好 Provider 和 base URL，用户只需要粘贴 API key。自定义模板可以选 Provider，自己填 base URL。
 - 保存时自动拉取 Model 列表，这一步同时就是连接测试。失败时按 §7 的错误类别显示原因。
 - 可以隐藏不用的 Model。拉取失败时可以手动填写模型 ID。
 - **不能手动修改 Model Capabilities**。

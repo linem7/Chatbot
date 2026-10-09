@@ -8,7 +8,11 @@ struct ChatbotApp: App {
         MenuBarExtra {
             StatusMenu(history: appDelegate.historyModel)
         } label: {
-            MenuBarLabel(store: appDelegate.chatStore, history: appDelegate.historyModel)
+            MenuBarLabel(
+                store: appDelegate.chatStore,
+                history: appDelegate.historyModel,
+                settingsNavigation: appDelegate.settingsNavigation
+            )
         }
 
         Window("Chatbot", id: AppWindow.mainWindowID) {
@@ -19,7 +23,12 @@ struct ChatbotApp: App {
         .defaultLaunchBehavior(.suppressed)
 
         Settings {
-            SettingsView(store: appDelegate.chatStore)
+            SettingsView(
+                chat: appDelegate.chatStore,
+                history: appDelegate.historyModel,
+                navigation: appDelegate.settingsNavigation,
+                launchAtLogin: appDelegate.launchAtLogin
+            )
         }
     }
 }
@@ -51,6 +60,7 @@ private struct StatusMenu: View {
 private struct MenuBarLabel: View {
     let store: ChatStore
     let history: HistoryModel
+    let settingsNavigation: SettingsNavigation
     @Environment(\.openSettings) private var openSettings
     @Environment(\.openWindow) private var openWindow
 
@@ -59,10 +69,18 @@ private struct MenuBarLabel: View {
             .onAppear {
                 let openSettings = openSettings
                 let openWindow = openWindow
-                store.openSettings = { AppWindow.openSettings(with: openSettings) }
+                store.openSettings = { [store, settingsNavigation] in
+                    // 只有还没有 Connection 时 Quick Panel 才会让用户打开设置：直接去 Connection 页，预选 DeepSeek（SPEC §10）
+                    if !store.hasConnection { settingsNavigation.showConnections(template: .deepSeek) }
+                    AppWindow.openSettings(with: openSettings)
+                }
                 store.openMainWindow = { [history] conversationID in
                     history.select(conversationID)
                     AppWindow.openMainWindow(with: openWindow)
+                }
+                // 首次启动自动打开设置的 Connection 页（SPEC §10）
+                if settingsNavigation.takeFirstLaunchSettings() {
+                    AppWindow.openSettings(with: openSettings)
                 }
             }
     }

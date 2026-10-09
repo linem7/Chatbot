@@ -66,6 +66,14 @@ final class HistoryModel {
         await load()
     }
 
+    /// 删除 Connection 时，连同用它的所有 Conversation 一起删除（SPEC §9）。
+    func deleteConversations(ofConnection connectionID: UUID) async {
+        await chat.prepareToDeleteConnection(connectionID)
+        try? await store.deleteConversations(connectionID: connectionID)
+        if let selectedConversation, selectedConversation.connectionID == connectionID { selectedID = nil }
+        await load()
+    }
+
     /// 回到 Quick Panel 继续这个对话。
     func continueInQuickPanel(_ conversationID: UUID) {
         Task {
