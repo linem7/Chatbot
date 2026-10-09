@@ -8,8 +8,8 @@
 
 - **OpenAI 兼容**：按 Platform（base URL 的 host）发各自的关闭字段。
   - DeepSeek 官方：发 `thinking: disabled`。
-  - OpenRouter：发 `reasoning: {enabled: false}`；`/models` 报告思考关不掉（`reasoning.mandatory`）的模型，发它支持的最低档 `reasoning.effort`。
-  - 阿里云百炼：发 `enable_thinking: false`；只会思考的模型（deepseek-r1、QwQ 等）不发。
+  - OpenRouter：发 `reasoning: {enabled: false}`；`/models` 报告思考关不掉（`reasoning.mandatory`）的模型，发它支持的最低档 `reasoning.effort`。缓存的 Model 列表里没有这项信息时（升级前保存的 Connection），只给 DeepSeek 发，其他模型不发，以免关不掉思考的模型被拒。
+  - 阿里云百炼：发 `enable_thinking: false`；只会思考的模型（deepseek-r1、QwQ、QVQ 等）不发。
   - 不认识的服务什么都不发，以免请求被拒。
 - **Anthropic**：能关就关，按 `/v1/models` 的 capabilities 处理。
   - Model 能关闭思考（`thinking.types.disabled.supported` 为 true）时，发 `thinking: {type: "disabled"}`。

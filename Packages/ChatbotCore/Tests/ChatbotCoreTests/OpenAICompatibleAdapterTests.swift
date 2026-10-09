@@ -231,6 +231,35 @@ struct OpenAICompatibleAdapterTests {
         #expect(try await sentFields(optional)["reasoning"] == .object(["enabled": .bool(false)]))
     }
 
+    @Test func openRouterConnectionsSavedBeforeReasoningInfoOnlyDisableDeepSeek() async throws {
+        // #53 之前保存的 Connection：缓存的 Model 没有 providerData
+        let old = connection("https://openrouter.ai/api/v1", models: [
+            ModelInfo(id: "deepseek/deepseek-v4.1-flash", capabilities: .conservative),
+            ModelInfo(id: "google/gemini-3.8-flash", capabilities: .conservative),
+        ])
+        var deepSeek = request(connection: old)
+        deepSeek.modelID = "deepseek/deepseek-v4.1-flash"
+        #expect(try await sentFields(deepSeek)["reasoning"] == .object(["enabled": .bool(false)]))
+
+        var gemini = request(connection: old)
+        gemini.modelID = "google/gemini-3.8-flash"
+        #expect(try await sentFields(gemini)["reasoning"] == nil)
+    }
+
+    @Test func lowestEffortDoesNotDependOnListOrder() async throws {
+        // 构造的 reasoning 对象：档位故意按从低到高排列
+        let model = ModelInfo(
+            id: "vendor/must-reason", capabilities: .conservative,
+            providerData: .object(["reasoning": .object([
+                "mandatory": .bool(true),
+                "supported_efforts": .array([.string("medium"), .string("high"), .string("max")]),
+            ])])
+        )
+        var request = request(connection: connection("https://openrouter.ai/api/v1", models: [model]))
+        request.modelID = "vendor/must-reason"
+        #expect(try await sentFields(request)["reasoning"] == .object(["effort": .string("medium")]))
+    }
+
     @Test(arguments: [
         "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
@@ -245,7 +274,7 @@ struct OpenAICompatibleAdapterTests {
         #expect(fields["reasoning"] == nil)
     }
 
-    @Test(arguments: ["deepseek-r1", "deepseek-r1-0528", "qwq-plus", "qwen3-235b-a22b-thinking-2507"])
+    @Test(arguments: ["deepseek-r1", "deepseek-r1-0528", "qwq-plus", "qvq-max", "qwen3-235b-a22b-thinking-2507"])
     func bailianThinkingOnlyModelsGetNoThinkingField(modelID: String) async throws {
         var request = request(connection: connection("https://dashscope.aliyuncs.com/compatible-mode/v1"))
         request.modelID = modelID
@@ -254,8 +283,9 @@ struct OpenAICompatibleAdapterTests {
 
     @Test func platformIsRecognizedByHost() {
         #expect(Platform(host: "api.deepseek.com") == .deepSeek)
-        #expect(Platform(host: "openrouter.ai") == .openRouter)
-        #expect(Platform(host: "eu.openrouter.ai") == .openRouter)
+        #expect(Platform(host: "openrouter.ai") == .openRouter(.global))
+        #expect(Platform(host: "us.openrouter.ai") == .openRouter(.us))
+        #expect(Platform(host: "eu.openrouter.ai") == .openRouter(.eu))
         #expect(Platform(host: "dashscope.aliyuncs.com") == .bailian)
         #expect(Platform(host: "dashscope-us.aliyuncs.com") == .bailian)
         #expect(Platform(host: "cn-hongkong.dashscope.aliyuncs.com") == .bailian)
@@ -265,6 +295,20 @@ struct OpenAICompatibleAdapterTests {
         #expect(Platform(host: "notopenrouter.ai") == nil)
         #expect(Platform(host: "localhost") == nil)
         #expect(Platform(host: nil) == nil)
+    }
+
+    @Test func serverWebSearchSupportFollowsPlatformAndEndpoint() {
+        #expect(Platform.deepSeek.supportsServerWebSearch == false)
+        #expect(Platform.openRouter(.global).supportsServerWebSearch)
+        #expect(Platform.openRouter(.us).supportsServerWebSearch)
+        #expect(Platform.openRouter(.eu).supportsServerWebSearch == false)
+        #expect(Platform.bailian.supportsServerWebSearch)
+    }
+
+    @Test func euEndpointStillDisablesReasoning() async throws {
+        var request = request(connection: connection("https://eu.openrouter.ai/api/v1"))
+        request.modelID = "deepseek/deepseek-v4.1-flash"
+        #expect(try await sentFields(request)["reasoning"] == .object(["enabled": .bool(false)]))
     }
 
     // MARK: 附件

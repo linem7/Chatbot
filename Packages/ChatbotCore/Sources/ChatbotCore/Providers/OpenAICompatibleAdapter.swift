@@ -129,9 +129,9 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
         case .openRouter:
             body.reasoning = openRouterReasoning(for: request)
         case .bailian:
-            // 只会思考的模型（deepseek-r1、QwQ、*-thinking）不接受关闭，发了可能报错
+            // 只会思考的模型（deepseek-r1、QwQ、QVQ、*-thinking）不接受关闭，发了可能报错
             let id = request.modelID.lowercased()
-            let thinkingOnly = id.hasPrefix("deepseek-r1") || id.hasPrefix("qwq") || id.contains("thinking")
+            let thinkingOnly = ["deepseek-r1", "qwq", "qvq"].contains { id.hasPrefix($0) } || id.contains("thinking")
             body.enableThinking = thinkingOnly ? nil : false
         case nil:
             break
@@ -213,15 +213,23 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
         }
     }
 
-    /// OpenRouter 的统一 `reasoning` 参数。`/models` 报告 `reasoning.mandatory` 的模型关不掉思考，
-    /// 发 `enabled: false` 会被拒绝，改发它支持的最低档 effort（`supported_efforts` 按从高到低排列）；
-    /// 没有档位可选就什么都不发。
+    /// OpenRouter 的统一 `reasoning` 参数，按 `/models` 报告的 `reasoning` 对象（存在 providerData 里）决定：
+    /// - `mandatory` 的模型关不掉思考，发 `enabled: false` 会被拒绝，改发它支持的最低档 effort；没有档位可选就什么都不发。
+    /// - 其他模型发 `enabled: false`。
+    /// - 没有 `reasoning` 信息（#53 之前保存的 Connection，或者这个模型不会思考）：只给 DeepSeek 发 `enabled: false`
+    ///   （OpenRouter 上的 DeepSeek 都能关），其他模型什么都不发，免得关不掉思考的模型被拒；重新拉取 Model 列表后按上面处理。
     private static func openRouterReasoning(for request: ModelRequest) -> ChatRequestBody.Reasoning? {
-        let reasoning = request.connection.models.first { $0.id == request.modelID }?.providerData?["reasoning"]
-        guard reasoning?["mandatory"]?.boolValue == true else { return .init(enabled: false) }
-        guard case .array(let efforts)? = reasoning?["supported_efforts"], let lowest = efforts.last?.stringValue else { return nil }
-        return .init(effort: lowest)
+        guard let reasoning = request.connection.models.first(where: { $0.id == request.modelID })?.providerData?["reasoning"] else {
+            return request.modelID.lowercased().hasPrefix("deepseek/") ? .init(enabled: false) : nil
+        }
+        guard reasoning["mandatory"]?.boolValue == true else { return .init(enabled: false) }
+        guard case .array(let efforts)? = reasoning["supported_efforts"] else { return nil }
+        let supported = Set(efforts.compactMap(\.stringValue))
+        return openRouterEffortsFromLowest.first(where: supported.contains).map { .init(effort: $0) }
     }
+
+    /// OpenRouter 的 effort 档位，从低到高（`none` 是关闭，关不掉思考的模型不接受）。接口没有承诺 `supported_efforts` 的顺序。
+    private static let openRouterEffortsFromLowest = ["minimal", "low", "medium", "high", "xhigh", "max"]
 
     /// 把其他错误统一成 ChatError；取消原样往外传。
     private static func normalize(_ error: any Error) -> any Error {
