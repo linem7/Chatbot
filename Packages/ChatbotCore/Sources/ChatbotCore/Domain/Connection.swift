@@ -46,6 +46,11 @@ public struct Connection: Codable, Sendable, Hashable, Identifiable {
         Connection(id: id, name: name, provider: .anthropic, baseURL: URL(string: "https://api.anthropic.com")!)
     }
 
+    /// Gemini 模板：base URL `https://generativelanguage.googleapis.com`，路径里的 `/v1beta` 由 adapter 加。
+    public static func gemini(id: UUID = UUID(), name: String = "Gemini") -> Connection {
+        Connection(id: id, name: name, provider: .gemini, baseURL: URL(string: "https://generativelanguage.googleapis.com")!)
+    }
+
     /// 是否是 DeepSeek 的官方接口。DeepSeek 需要一些非标准字段（例如关闭思考的 `thinking`）。
     var isDeepSeek: Bool {
         guard let host = baseURL.host?.lowercased() else { return false }

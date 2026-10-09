@@ -334,6 +334,20 @@ struct AnthropicAdapterTests {
         #expect((fields["tools"] != nil) == webSearch)
     }
 
+    @Test func unknownModelsThatReplayThinkingBlocksAlsoGetDropBlock() async throws {
+        // 能力未知时本来什么都不发；但回传了思考块，说明这个 Model 支持思考，用 drop_block 兜底
+        let (headers, fields) = try await sent(request(
+            models: [], modelID: "claude-unknown", messages: [.user("一"), answerWithThinking, .user("二")]
+        ))
+        let adaptive: JSONValue = .object([
+            "type": .string("adaptive"),
+            "block_binding": .object(["prefix_mismatch_behavior": .string("drop_block")]),
+        ])
+        #expect(fields["thinking"] == adaptive)
+        #expect(headers["anthropic-beta"] == "thinking-binding-controls-2026-08-01")
+        #expect(fields["output_config"] == nil)
+    }
+
     @Test func noBindingControlsWhenNoThinkingBlockIsReplayed() async throws {
         let opus55 = model("claude-opus-5-5", thinkingCanBeDisabled: false)
         let (headers, fields) = try await sent(request(models: [opus55], modelID: "claude-opus-5-5"))
