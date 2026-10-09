@@ -44,6 +44,27 @@ struct AttachmentIntakeTests {
         #expect(attachment.content == .text("中文 text"))
     }
 
+    @Test(arguments: [false, true])
+    func utf32WithByteOrderMarkIsDecoded(bigEndian: Bool) throws {
+        var bytes: [UInt8] = bigEndian ? [0x00, 0x00, 0xFE, 0xFF] : [0xFF, 0xFE, 0x00, 0x00]
+        for scalar in "中文 text".unicodeScalars {
+            let value = scalar.value
+            let le = [UInt8(value & 0xFF), UInt8((value >> 8) & 0xFF), UInt8((value >> 16) & 0xFF), UInt8(value >> 24)]
+            bytes += bigEndian ? le.reversed() : le
+        }
+        let attachment = try AttachmentIntake().attachment(fromFile: try file("a.txt", bytes))
+        #expect(attachment.content == .text("中文 text"))
+    }
+
+    @Test func bundleDirectoriesAreUnsupportedRatherThanUnreadable() throws {
+        // .pages、.key 这类文稿在 Finder 里看起来是文件，其实是目录
+        let url = directory.appendingPathComponent("周报.pages", isDirectory: true)
+        try FileManager.default.createDirectory(at: url.appendingPathComponent("Data"), withIntermediateDirectories: true)
+        #expect(throws: AttachmentError.unsupportedType(name: "周报.pages")) {
+            try AttachmentIntake().attachment(fromFile: url)
+        }
+    }
+
     @Test func binaryFilesAreRejected() throws {
         // .docx 是 zip，里面有 NUL 字节
         let url = try file("报告.docx", [0x50, 0x4B, 0x03, 0x04, 0x14, 0x00, 0x06, 0x00, 0x00, 0x00])

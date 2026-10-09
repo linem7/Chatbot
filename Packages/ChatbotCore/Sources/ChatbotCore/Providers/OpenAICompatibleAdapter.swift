@@ -139,7 +139,9 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
         )
     }
 
-    /// 用户 Message 按内容块的顺序编码。图片用 base64 data URL；Model 不接受图片时直接略过（SPEC §4，
+    static let omittedImageNote = "[图片已省略：当前模型不支持图片]"
+
+    /// 用户 Message 按内容块的顺序编码。图片用 base64 data URL；Model 不接受图片时换成占位文字（SPEC §4，
     /// 界面另有提示）。文本和 PDF 附件作为文字块，前面加上文件名（ARCHITECTURE §6）。
     private static func userParts(_ message: Message, attachments: [UUID: Attachment], acceptsImages: Bool) -> [ContentPart] {
         message.content.compactMap { block in
@@ -151,7 +153,8 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
                 guard let attachment = attachments[id] else { return nil }
                 switch attachment.content {
                 case .image(let data, let mediaType):
-                    return acceptsImages ? .imageURL("data:\(mediaType);base64,\(data.base64EncodedString())") : nil
+                    // 不接受图片时留一段占位文字：模型知道这里本来有图，只有图片的 Message 也不会整条消失
+                    return acceptsImages ? .imageURL("data:\(mediaType);base64,\(data.base64EncodedString())") : .text(Self.omittedImageNote)
                 case .text(let text):
                     return .text("附件 \(attachment.originalName)：\n\(text)")
                 }

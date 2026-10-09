@@ -224,11 +224,11 @@ struct OpenAICompatibleAdapterTests {
         ]))
     }
 
-    @Test func imagesAreLeftOutWhenTheModelCannotTakeThem() async throws {
-        // SPEC §4：当前 Model 不支持图片时忽略图片（界面另有提示）
+    @Test func imagesAreReplacedByANoteWhenTheModelCannotTakeThem() async throws {
+        // SPEC §4：当前 Model 不支持图片时忽略图片（界面另有提示）；留一段占位文字，模型知道这里本来有图
         let messages = try await sentMessages(requestWithAttachments(imageInput: false))
         #expect(messages == .array([
-            .object(["role": .string("user"), "content": .string("附件 main.swift：\nprint(1)\n\n看看这个")]),
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]\n\n附件 main.swift：\nprint(1)\n\n看看这个")]),
         ]))
     }
 
@@ -237,7 +237,24 @@ struct OpenAICompatibleAdapterTests {
         request.connection.models = []
         let messages = try await sentMessages(request)
         #expect(messages == .array([
-            .object(["role": .string("user"), "content": .string("附件 main.swift：\nprint(1)\n\n看看这个")]),
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]\n\n附件 main.swift：\nprint(1)\n\n看看这个")]),
+        ]))
+    }
+
+    @Test func imageOnlyMessagesKeepUserAndAssistantAlternating() async throws {
+        // 只有图片的用户 Message 不能整条消失，否则会出现连续两条 assistant
+        let image = Attachment(kind: .image, originalName: "截图.png", content: .image(Data([1]), mediaType: "image/png"))
+        var request = request(messages: [
+            .user("", attachments: [image]),
+            Message(role: .assistant, content: [ContentBlock(.text("我看不到图片"))]),
+            .user("那算了"),
+        ])
+        request.attachments = [image.id: image]
+        let messages = try await sentMessages(request)
+        #expect(messages == .array([
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]")]),
+            .object(["role": .string("assistant"), "content": .string("我看不到图片")]),
+            .object(["role": .string("user"), "content": .string("那算了")]),
         ]))
     }
 

@@ -16,6 +16,11 @@ public struct AttachmentIntake: Sendable {
     /// 处理一个文件（「+」、拖放，或者从 Finder 复制后粘贴）。
     public func attachment(fromFile url: URL) throws -> Attachment {
         let name = url.lastPathComponent
+        // .pages、.key 这类 bundle 在 Finder 里像一个文件，其实是目录
+        var isDirectory: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory), isDirectory.boolValue {
+            throw AttachmentError.unsupportedType(name: name)
+        }
         let data: Data
         do {
             data = try Data(contentsOf: url)
@@ -45,9 +50,19 @@ public struct AttachmentIntake: Sendable {
 enum TextDecoder {
     static func decode(_ data: Data) -> String? {
         let bytes = [UInt8](data)
-        // UTF-16 和 UTF-32 带 BOM 时会有 NUL 字节，要在二进制检查之前处理
-        if bytes.starts(with: [0xFF, 0xFE]) || bytes.starts(with: [0xFE, 0xFF]) {
-            return String(data: data, encoding: .utf16)
+        // UTF-16 和 UTF-32 带 BOM 时会有 NUL 字节，要在二进制检查之前处理。
+        // UTF-32 LE 的 BOM（FF FE 00 00）以 UTF-16 LE 的 BOM 开头，所以先判断 UTF-32
+        if bytes.starts(with: [0xFF, 0xFE, 0x00, 0x00]) {
+            return decode(bytes.dropFirst(4), as: .utf32LittleEndian)
+        }
+        if bytes.starts(with: [0x00, 0x00, 0xFE, 0xFF]) {
+            return decode(bytes.dropFirst(4), as: .utf32BigEndian)
+        }
+        if bytes.starts(with: [0xFF, 0xFE]) {
+            return decode(bytes.dropFirst(2), as: .utf16LittleEndian)
+        }
+        if bytes.starts(with: [0xFE, 0xFF]) {
+            return decode(bytes.dropFirst(2), as: .utf16BigEndian)
         }
         // 前 8KB 里有 NUL 字节，就当成二进制文件（Office 文档、压缩包、可执行文件……）
         if bytes.prefix(8_192).contains(0) { return nil }
@@ -57,6 +72,11 @@ enum TextDecoder {
             return text
         }
         return detectEncoding(data)
+    }
+
+    /// 去掉 BOM 之后按指定编码解码。
+    private static func decode(_ bytes: ArraySlice<UInt8>, as encoding: String.Encoding) -> String? {
+        String(data: Data(bytes), encoding: encoding)
     }
 
     /// UTF-8 失败时用系统的编码检测（例如 GBK、Shift_JIS 的旧文件）。
