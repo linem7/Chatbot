@@ -8,11 +8,12 @@ struct SettingsView: View {
     let history: HistoryModel
     @Bindable var navigation: SettingsNavigation
     let launchAtLogin: LaunchAtLogin
+    let hotkey: HotkeyController
 
     var body: some View {
         TabView(selection: $navigation.tab) {
             Tab("General", systemImage: "gearshape", value: SettingsTab.general) {
-                GeneralSettingsView(connections: chat.connections, launchAtLogin: launchAtLogin)
+                GeneralSettingsView(connections: chat.connections, launchAtLogin: launchAtLogin, hotkey: hotkey)
             }
             Tab("Connections", systemImage: "network", value: SettingsTab.connections) {
                 ConnectionsSettingsView(chat: chat, history: history, navigation: navigation)
@@ -31,17 +32,30 @@ struct SettingsView: View {
 private struct GeneralSettingsView: View {
     @Bindable var connections: ConnectionStore
     let launchAtLogin: LaunchAtLogin
+    let hotkey: HotkeyController
 
     var body: some View {
         Form {
             Section {
-                // 改键时和系统快捷键冲突，Recorder 自己会提示（SPEC §2.1）
-                LabeledContent("Hotkey") {
-                    KeyboardShortcuts.Recorder(for: .toggleQuickPanel)
+                Picker("Hotkey", selection: Binding(
+                    get: { hotkey.trigger },
+                    set: { hotkey.select($0) }
+                )) {
+                    ForEach(HotkeyTrigger.allCases) { trigger in
+                        Text(trigger.label).tag(trigger)
+                    }
                 }
-                Text(Hotkey.otherAppsHint)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if hotkey.trigger == .shortcut {
+                    // 改键时和系统快捷键冲突，Recorder 自己会提示（SPEC §2.1）
+                    LabeledContent("Combination") {
+                        KeyboardShortcuts.Recorder(for: .toggleQuickPanel)
+                    }
+                    Text(Hotkey.otherAppsHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    doubleCommandRows
+                }
             }
 
             Section {
@@ -80,7 +94,28 @@ private struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { launchAtLogin.refresh() }
+        .onAppear {
+            launchAtLogin.refresh()
+            // 用户可能刚在 System Settings 里把权限打开，设置窗一露面就重看一次（#64）
+            hotkey.refreshPermission()
+        }
+    }
+
+    /// ⌘ 双击读的是全系统的修饰键状态，先得有「辅助功能」权限（SPEC §2.1、#64）。
+    @ViewBuilder private var doubleCommandRows: some View {
+        if hotkey.isTrusted {
+            Text("A double ⌘ opens the Quick Panel from anywhere. The key combination no longer works while this is on.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } else {
+            HStack {
+                Text("Allow Chatbot in System Settings › Privacy & Security › Accessibility. Until then the key combination above still works.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Spacer()
+                Button("Open Accessibility") { hotkey.openSystemSettings() }
+            }
+        }
     }
 }
 

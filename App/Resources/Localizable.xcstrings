@@ -12,6 +12,16 @@
         }
       }
     },
+    "A double ⌘ opens the Quick Panel from anywhere. The key combination no longer works while this is on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在任意界面连按两次 ⌘ 都能唤起 Quick Panel。开启后上面的按键组合不再生效。"
+          }
+        }
+      }
+    },
     "API Key": {
       "localizations": {
         "zh-Hans": {
@@ -142,6 +152,16 @@
         }
       }
     },
+    "Allow Chatbot in System Settings › Privacy & Security › Accessibility. Until then the key combination above still works.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在 System Settings › Privacy & Security › Accessibility 里允许 Chatbot。在此之前上面的按键组合仍然可用。"
+          }
+        }
+      }
+    },
     "Ask anything": {
       "localizations": {
         "zh-Hans": {
@@ -218,6 +238,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "清空…"
+          }
+        }
+      }
+    },
+    "Combination": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合"
           }
         }
       }
@@ -422,6 +452,16 @@
         }
       }
     },
+    "Key combination": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按键组合"
+          }
+        }
+      }
+    },
     "Launch at Login": {
       "localizations": {
         "zh-Hans": {
@@ -542,6 +582,16 @@
         }
       }
     },
+    "Open Accessibility": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开辅助功能"
+          }
+        }
+      }
+    },
     "Open Login Items": {
       "localizations": {
         "zh-Hans": {
@@ -618,6 +668,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "粘贴的图片"
+          }
+        }
+      }
+    },
+    "Pin: keep the panel in front of other windows": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "固定：让面板一直保持在其它窗口之前"
+          }
+        }
+      }
+    },
+    "Press ⌘ twice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连按两次 ⌘"
           }
         }
       }
@@ -882,6 +952,16 @@
         }
       }
     },
+    "Unpin: hide the panel when it loses focus": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消固定：失焦时重新收起面板"
+          }
+        }
+      }
+    },
     "Untitled": {
       "localizations": {
         "zh-Hans": {
@@ -958,26 +1038,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "⏎ 发送 · ⇧⏎ 换行"
-          }
-        }
-      }
-    },
-    "Pin: keep the panel in front of other windows": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "固定：让面板一直保持在其它窗口之前"
-          }
-        }
-      }
-    },
-    "Unpin: hide the panel when it loses focus": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "取消固定：失焦时重新收起面板"
           }
         }
       }

@@ -27,7 +27,8 @@ struct ChatbotApp: App {
                 chat: appDelegate.chatStore,
                 history: appDelegate.historyModel,
                 navigation: appDelegate.settingsNavigation,
-                launchAtLogin: appDelegate.launchAtLogin
+                launchAtLogin: appDelegate.launchAtLogin,
+                hotkey: appDelegate.hotkey
             )
         }
     }

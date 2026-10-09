@@ -117,6 +117,10 @@ final class ChatStore {
         isPanelPinned.toggle()
     }
 
+    /// 用户有没有拖过 Quick Panel。拖过之后，本次运行内再唤起就停在拖到的位置，不再重新定位（SPEC §2.2、#63）。
+    /// 和 `isPanelPinned` 一样只在本次运行内有效，不写进设置。
+    var hasMovedPanel = false
+
     nonisolated static func shouldStartNewConversation(lastTurnEndedAt: Date?, isGenerating: Bool, now: Date) -> Bool {
         // 后台还有回答在生成时，一律接着那个 Conversation
         if isGenerating { return false }

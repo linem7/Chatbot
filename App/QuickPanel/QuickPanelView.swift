@@ -1,3 +1,4 @@
+import AppKit
 import ChatbotCore
 import SwiftUI
 
@@ -63,7 +64,9 @@ private struct QuickPanelHeader: View {
         HStack(spacing: 8) {
             ModelPicker(store: store)
                 .frame(width: 190, alignment: .leading)
-            Spacer(minLength: 0)
+            // 中间这块空当兼作拖动手柄（#63）
+            HeaderDragArea { store.hasMovedPanel = true }
+                .frame(maxWidth: .infinity)
             Button {
                 store.togglePanelPinned()
             } label: {
@@ -101,8 +104,45 @@ private struct QuickPanelHeader: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .padding(.horizontal, 210)
+                // 标题压在拖动手柄上，别把鼠标事件吃掉（#63）
+                .allowsHitTesting(false)
         }
         .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 10))
+    }
+}
+
+/// 顶栏上按住就能拖动 Quick Panel 的区域（#63）。
+///
+/// 面板是 `.borderless` 的无边框窗口，系统不给标题栏，所以自己接住 `mouseDown` 交给
+/// `NSWindow.performDrag(with:)`，剩下的交给系统。只有这一处能拖：消息区、输入框的选字和点按都不受影响
+/// （`isMovableByWindowBackground` 保持 false）。
+private struct HeaderDragArea: NSViewRepresentable {
+    /// 拖动开始时回调一次，用来记下「面板被拖过了」（SPEC §2.2）。
+    let onDragStart: () -> Void
+
+    func makeNSView(context: Context) -> NSView { DragView(onDragStart: onDragStart) }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    private final class DragView: NSView {
+        private let onDragStart: () -> Void
+
+        init(onDragStart: @escaping () -> Void) {
+            self.onDragStart = onDragStart
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override func mouseDown(with event: NSEvent) {
+            onDragStart()
+            window?.performDrag(with: event)
+        }
+
+        // 整条顶栏空当都是拖动区，鼠标移上去给个能抓的手型，比无边框窗口默认的箭头好认
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
     }
 }
 
