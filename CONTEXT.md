@@ -24,6 +24,20 @@ _Avoid_: 配置实例、Service、Account、Endpoint
 一个 Model 能接受什么输入、能做什么：是否支持图片、PDF、tool calling。决定截图和上传入口是否可用。
 _Avoid_: Provider 能力（能力属于 Model，不属于 Provider）
 
+### 界面
+
+**Hotkey**:
+从任何 app 里唤起 Quick Panel 的全局快捷键，默认是 option+space，用户可以改。
+_Avoid_: 快捷键（不加限定时容易和面板内的快捷键混淆）
+
+**Quick Panel**:
+按 Hotkey 唤起的浮动面板，不抢走前台 app 的激活状态，用来快速提问，问完就收起。
+_Avoid_: 浮窗、弹窗、Popup
+
+**Main Window**:
+普通的 app 窗口，用来浏览历史 Conversation 和修改设置。
+_Avoid_: 主界面
+
 ### 对话
 
 **Conversation**:
