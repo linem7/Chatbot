@@ -24,7 +24,7 @@
 - #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。B 方案的原型发布在 GitHub Pages：https://linem7.github.io/Chatbot/ （源是孤儿分支 `gh-pages`，只有 `index.html` 和 `.nojekyll`）。`prototype/quick-panel` 分支已删除；含三个变体的完整版只剩 Claude Artifact 那份。
 - #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
-- v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
+- 2026-10-10 用户决定发布 **v1.0.0** 给朋友安装，推翻此前“v1 只自用、不发 Release”的决定。采用本机固定自签名构建、Apple Silicon ZIP、手动上传 GitHub Release；最低 macOS 26，不做公证或自动更新。用户明确跳过本次发布前测试和试装。
 - 2026-10-09 应用户要求，仓库最终改为 **public**（来回改过几次），这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。GitHub Pages 已从 `gh-pages` 分支重新开启。
 - **2026-10-09 v1 实现完成**：实现 ticket #17–#25 全部关闭，PR 是 #26–#38、#40、#41（#39 是真机验证清单 issue）。用户在 Mac 上完成了真机验证，#39 已关闭。
 - **2026-10-09 真机反馈处理完成**：地图 #45「v1.1：真机反馈」已关闭（调研 PR #52，实现 PR #55–#58），用户复测通过。用户在这一轮定的，都已写进文档：

@@ -188,8 +188,9 @@
 
 ## 11. 分发与更新
 
-- **v1 只自用**：在本机用 Xcode 构建、打包，再安装。用自签名证书签名，不做公证（ADR-0005）。
-- **不做更新检查，也不在 GitHub Release 上发布**。以后要分发给别人时，再加上 tag 自动发布和「有新版本」提示（仓库已经是公开的）。届时用户第一次打开时，需要到「系统设置 → 隐私与安全性」里点「仍要打开」。
+- **v1.0.0 通过 GitHub Release 分发**：在本机用 Xcode 构建 Apple Silicon Release，使用固定自签名证书签名，不做公证（ADR-0005），手动上传应用 ZIP。最低 macOS 26。
+- 首次打开如被拦截，用户进入 **System Settings › Privacy & Security › Open Anyway**。安装和升级步骤见 [安装指引](INSTALL.md)。
+- 不做更新检查、自动更新或 tag 自动发布；用户下载新版本手动替换应用。
 
 ## 12. v1 明确不做
 
@@ -202,6 +203,6 @@
 - 导出 Conversation
 - 手动覆盖 Model Capabilities
 - LaTeX 公式渲染
-- 对外分发：GitHub Release 发布、更新检查、自动更新
+- 更新检查、自动更新、tag 自动发布
 - Mac App Store 分发、App Sandbox
 - 跨平台和移动端、插件系统、团队协作、iCloud 同步

@@ -16,7 +16,7 @@
 | bundle id | `com.linem7.Chatbot` |
 | 签名 | 本机构建时用一张固定的自签名证书，不做公证（ADR-0005） |
 | CI | GitHub Actions macOS runner，push 到 main 和 PR 时都构建并跑测试。仓库是公开的，标准 runner 不收费。CI 不签名，也不发布 |
-| 分发 | v1 只自用：在本机构建后安装。不发 GitHub Release，也不做更新检查 |
+| 分发 | 本机构建 Apple Silicon Release，以固定自签名证书签名，手动上传 ZIP 到 GitHub Release；不做公证、更新检查或自动更新 |
 | 日志 | 只用 `os.Logger`，不记录 key 和对话内容，不做远程上报 |
 
 ## 2. 模块划分
