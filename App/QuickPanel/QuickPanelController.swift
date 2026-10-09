@@ -19,6 +19,11 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     private let panel: QuickPanel
     private var isShown = false
     private var keyMonitor: Any?
+    /// 文件面板打开期间，Quick Panel 会失焦，但不应该隐藏。
+    private var isPresentingFilePicker = false
+    /// 为了打开文件面板激活过 app 时，原来在前台的 app。隐藏 Quick Panel 时把激活状态还给它
+    /// （CONTEXT：Quick Panel 不抢走前台 app 的激活状态）。
+    private var previousFrontmostApp: NSRunningApplication?
 
     init(store: ChatStore) {
         self.store = store
@@ -40,6 +45,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.delegate = self
         panel.contentView = makeContentView()
+        store.presentFilePicker = { [weak self] in self?.presentFilePicker() }
     }
 
     func toggle() {
@@ -64,10 +70,50 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         removeKeyMonitor()
         panel.orderOut(nil)
         store.panelDidHide()
+        restorePreviousFrontmostApp()
+    }
+
+    /// 把激活状态还给打开文件面板之前在前台的 app。设置窗口（以后还有主窗口）开着时，说明用户正在用我们的 app，不还。
+    private func restorePreviousFrontmostApp() {
+        guard let app = previousFrontmostApp else { return }
+        previousFrontmostApp = nil
+        let hasOtherVisibleWindow = NSApp.windows.contains { $0 !== panel && $0.isVisible && $0.canBecomeMain }
+        guard !hasOtherVisibleWindow, !app.isTerminated else { return }
+        NSApp.yieldActivation(to: app)
+        _ = app.activate(from: .current, options: [])
     }
 
     func windowDidResignKey(_ notification: Notification) {
+        guard !isPresentingFilePicker else { return }
         hide()
+    }
+
+    // MARK: - 「+」添加附件
+
+    /// 打开文件面板选附件（SPEC §4）。
+    ///
+    /// Quick Panel 是不激活 app 的面板，app 本身不在前台，文件面板可能出现在别的 app 的窗口后面。
+    /// 所以打开前先激活 app 兜底；关闭后让 Quick Panel 重新成为 key window，焦点回到输入框。
+    /// 激活过的话，隐藏 Quick Panel 时再把激活状态还给原来的 app（见 `restorePreviousFrontmostApp`）。
+    private func presentFilePicker() {
+        guard isShown, !isPresentingFilePicker else { return }
+        isPresentingFilePicker = true
+        defer {
+            isPresentingFilePicker = false
+            panel.makeKeyAndOrderFront(nil)
+            composer.focus()
+        }
+        // 激活前记下原来在前台的 app；我们的 app 本来就在前台时（例如设置窗口开着）不用记
+        if previousFrontmostApp == nil, let frontmost = NSWorkspace.shared.frontmostApplication, frontmost != .current {
+            previousFrontmostApp = frontmost
+        }
+        NSApp.activate()
+        let openPanel = NSOpenPanel()
+        openPanel.allowsMultipleSelection = true
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+        guard openPanel.runModal() == .OK else { return }
+        store.addAttachments(fromFiles: openPanel.urls)
     }
 
     // MARK: - 布局
