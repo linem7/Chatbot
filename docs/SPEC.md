@@ -133,7 +133,7 @@
 
 - 列表按最后一条消息的时间倒序排列。
 - **全文搜索**，范围包括标题和所有消息正文。
-- 点开一个 Conversation 可以查看完整内容，也可以继续对话。
+- 点开一个 Conversation 可以查看完整内容，也可以继续对话。在 Main Window 的详情里点「在 Quick Panel 中继续」，或者双击列表项，会把这个 Conversation 装进 Quick Panel 并弹出，然后在面板里继续对话。如果 Quick Panel 里正有别的 Conversation 在生成，按 ⌘N 的规则先停止当前回答（保留为 Interrupted），再装入；选中的正是正在生成的那个时，直接弹出面板，不停止生成。
 - **标题**：第一次 Turn 结束后，由这个 Conversation 的 Model 在后台生成一次。生成之前或生成失败时，用第一条用户消息的前一行代替。
 - **删除**：
   - 右键或按 ⌫ 删除单个 Conversation，不弹确认；

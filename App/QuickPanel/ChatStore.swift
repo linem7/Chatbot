@@ -140,7 +140,7 @@ final class ChatStore {
     }
 
     /// 打开一个已保存的 Conversation，在 Quick Panel 里继续（Main Window 的「在 Quick Panel 中继续」）。
-    /// 正在生成别的对话时，和 ⌘N 一样先停止。打开后 10 分钟规则从现在算起。
+    /// 正在生成别的对话时，和 ⌘N 一样先停止；打开的正是正在生成的那个时，什么都不动。打开后 10 分钟规则从现在算起。
     func open(_ conversationID: UUID) async {
         if conversation?.id != conversationID {
             guard let stored = try? await history.conversation(conversationID) else { return }
