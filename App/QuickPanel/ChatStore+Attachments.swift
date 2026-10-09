@@ -39,11 +39,22 @@ extension ChatStore {
 
     /// 当前 Model 是否接受图片，以 Model Capabilities 为准（SPEC §4）。
     var currentModelAcceptsImages: Bool {
-        guard let model = currentModel,
-              let connection = connections.connection(id: model.connectionID),
-              let info = connection.models.first(where: { $0.id == model.modelID })
-        else { return false }
-        return info.capabilities.imageInput
+        currentModelCapabilities?.imageInput ?? false
+    }
+
+    /// 当前 Model 是否支持 Web Search；不支持时地球按钮置灰（SPEC §5）。
+    var currentModelSupportsWebSearch: Bool {
+        currentModelCapabilities?.webSearch ?? false
+    }
+
+    /// 地球按钮现在是不是开着：Model 支持搜索，并且这个 Conversation 没有关掉。
+    var isWebSearchOn: Bool {
+        currentModelSupportsWebSearch && (conversation?.webSearchEnabled ?? true)
+    }
+
+    private var currentModelCapabilities: ModelCapabilities? {
+        guard let model = currentModel, let connection = connections.connection(id: model.connectionID) else { return nil }
+        return connection.models.first { $0.id == model.modelID }?.capabilities
     }
 
     /// 草稿里有图片、而当前 Model 不接受图片时的提示。图片照样可以留着，但不会发给模型。

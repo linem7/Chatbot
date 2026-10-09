@@ -194,6 +194,7 @@ private struct ComposerView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Add Files…")
+                WebSearchButton(store: store)
                 Spacer(minLength: 0)
                 Text("⏎ Send · ⇧⏎ New Line")
                     .font(.system(size: 11.5))
@@ -255,5 +256,26 @@ private struct DraftAttachmentStrip: View {
             .padding(.top, 6)
             .padding(.trailing, 6)
         }
+    }
+}
+
+/// 地球按钮：对当前 Conversation 开关 Web Search。Model 不支持搜索时置灰（SPEC §5）。
+private struct WebSearchButton: View {
+    let store: ChatStore
+
+    var body: some View {
+        let supported = store.currentModelSupportsWebSearch
+        let isOn = store.isWebSearchOn
+        Button {
+            store.setWebSearchEnabled(!isOn)
+        } label: {
+            Image(systemName: "globe")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(isOn ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                .frame(width: 26, height: 26)
+        }
+        .buttonStyle(.borderless)
+        .disabled(!supported)
+        .help(!supported ? LocalizedStringKey("The current model doesn't support web search.") : isOn ? "Web Search: On" : "Web Search: Off")
     }
 }

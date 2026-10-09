@@ -1,11 +1,12 @@
 import ChatbotCore
 import SwiftUI
 
-/// 一条消息：用户消息是靠右的气泡，回答用 Markdown 渲染，下面附上 Interrupted 或 Failed 的说明。
-/// Quick Panel 和 Main Window 共用。
+/// 一条消息。Quick Panel 和 Main Window 共用这一套（ARCHITECTURE §2 的 Rendering/）。
+///
+/// 回答的显示按 SPEC §5、§6：搜索状态、带角标的正文、来源列表、Gemini 的搜索建议，以及中断或出错的提示。
 struct MessageRow: View {
     let message: Message
-    /// 这条消息引用的附件（用户消息的缩略图和文件名）。
+    /// 用户消息里引用的附件（按 `attachmentRef` 查好的）。
     let attachments: [Attachment]
 
     var body: some View {
@@ -13,26 +14,106 @@ struct MessageRow: View {
         case .user:
             UserMessageBubble(text: message.markdownText, attachments: attachments)
         case .assistant:
-            VStack(alignment: .leading, spacing: 6) {
-                if message.status == .streaming && message.content.isEmpty {
-                    TypingIndicator()
-                } else {
-                    AssistantMessageView(markdown: message.markdownText, isStreaming: message.status == .streaming)
-                        .equatable()
-                }
-                switch message.status {
-                case .interrupted:
-                    NoticeText(text: String(localized: "Interrupted"))
-                case .failed(let error):
-                    NoticeText(text: error.displayText)
-                case .streaming, .complete:
-                    EmptyView()
-                }
+            AssistantMessageRow(message: message, presentation: AnswerPresentation(message))
+        }
+    }
+}
+
+private struct AssistantMessageRow: View {
+    let message: Message
+    let presentation: AnswerPresentation
+
+    private var isStreaming: Bool { message.status == .streaming }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let status = presentation.searchStatus {
+                SearchStatusLine(status: status)
+            }
+            if !presentation.markdown.isEmpty {
+                AssistantMessageView(markdown: presentation.markdown, copyText: presentation.copyText, isStreaming: isStreaming)
+                    .equatable()
+            } else if isStreaming, presentation.searchStatus == nil {
+                TypingIndicator()
+            }
+            if !presentation.sources.isEmpty {
+                SourceList(sources: presentation.sources)
+            }
+            if let html = presentation.searchSuggestionHTML {
+                SearchSuggestionView(html: html)
+            }
+            switch message.status {
+            case .interrupted:
+                NoticeText(text: String(localized: "Interrupted"))
+            case .failed(let error):
+                NoticeText(text: error.displayText)
+            case .streaming, .complete:
+                EmptyView()
             }
         }
     }
 }
 
+/// 「正在搜索：关键词」；正文开始输出后变成一行灰字「搜索了：A、B」（SPEC §5）。
+private struct SearchStatusLine: View {
+    let status: AnswerPresentation.SearchStatus
+
+    private var isSearching: Bool {
+        if case .searching = status { return true }
+        return false
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "globe")
+                .symbolEffect(.pulse, isActive: isSearching)
+            switch status {
+            case .searching(let query):
+                Text("Searching: \(query)")
+            case .searched(let queries):
+                Text("Searched: \(queries.joined(separator: String(localized: ", ", comment: "搜索词之间的分隔符")))")
+            }
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(.secondary)
+        .lineLimit(2)
+    }
+}
+
+/// 回答末尾的来源列表：「[1] 标题 · 域名」，点击用默认浏览器打开（SPEC §5）。
+private struct SourceList: View {
+    let sources: [AnswerPresentation.Source]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text("Sources")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            ForEach(sources) { source in
+                Link(destination: source.url) {
+                    HStack(spacing: 4) {
+                        Text(verbatim: "[\(source.number)]")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                        Text(verbatim: source.title)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if source.domain != source.title {
+                            Text(verbatim: "· \(source.domain)")
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    .font(.system(size: 12))
+                }
+                .help(source.url.absoluteString)
+            }
+        }
+        .padding(.top, 2)
+    }
+}
+
+/// 中断、出错等提示。
 struct NoticeText: View {
     let text: String
 
@@ -44,6 +125,7 @@ struct NoticeText: View {
     }
 }
 
+/// 回答开始之前的「正在输入」。
 struct TypingIndicator: View {
     var body: some View {
         Image(systemName: "ellipsis")
