@@ -159,6 +159,17 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
 - **文本和代码**：按 UTF-8 解码，失败时尝试系统的编码检测。发送时作为文字块，前面加上文件名。
 - **入口**：Quick Panel 输入框的粘贴（`NSPasteboard` 中的图片数据或文件 URL）、拖放、「+」打开的 `NSOpenPanel`，三者都汇入同一个 `AttachmentIntake`。
 
+实现要点（#21）：
+- **处理**：`AttachmentIntake`（ChatbotCore）把文件或图片数据处理成 `Attachment`。
+  - 按扩展名判断图片和 PDF，其他文件一律当文本试着解码。前 8KB 有 NUL 字节就当成二进制拒绝，Office 文档也会因此被拒绝。
+  - 加入附件时的问题用 `AttachmentError` 报告，由界面提示，不进入 Turn：`unsupportedType`、`unreadable`、`scannedPDF`（扫描版）。
+- **发送**：
+  - 用户 Message 里用 `attachmentRef(id)` 按顺序引用附件，TurnRunner 把这个 Conversation 里所有附件放进 `ModelRequest.attachments`。
+  - adapter 按 Model Capabilities 编码：Model 支持图片时，图片作为 base64 data URL 发送；不支持或能力未知时略过图片，提示由界面负责。
+  - 文本和 PDF 附件作为文字块，前面加上「附件 文件名：」。
+- **存储**：附件副本写在 `attachments/<conversationID>/<attachmentID>.{jpg,png,txt}`，attachment 表的 `storedFile` 存这个文件名。PDF 存的是抽出的文字，所以 `extractedTextFile` 目前不用。
+- **平台**：ImageIO 和 PDFKit 只在 Apple 平台上可用，用 `#if canImport` 隔开。相关测试只在 CI 上跑。
+
 ## 7. 系统集成
 - **Hotkey**：使用 KeyboardShortcuts（底层是 Carbon `RegisterEventHotKey`，不需要权限），默认 option+space。用 `isTakenBySystem` 检测冲突，冲突时提示。
 - **Quick Panel**：`NSPanel` 子类，主要配置如下：
