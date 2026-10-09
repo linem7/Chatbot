@@ -71,9 +71,33 @@ struct TurnRunnerTests {
     @Test func inMemoryStoreTreatsTheSameUserMessageAsAnUpsert() async throws {
         let question = Message.user("q")
         let conversation = Conversation(connectionID: connection.id, modelID: "deepseek-flash")
-        await store.saveUserMessage(question, in: conversation)
-        await store.saveUserMessage(question, in: conversation)
+        try await store.saveUserMessage(question, in: conversation)
+        try await store.saveUserMessage(question, in: conversation)
         #expect(await store.messages(in: conversation.id) == [question])
+    }
+
+    @Test func attachmentsOfThisAndEarlierMessagesArePassedToTheAdapter() async throws {
+        let earlier = Attachment(kind: .text, originalName: "a.txt", content: .text("早先的附件"))
+        let now = Attachment(kind: .image, originalName: "b.png", content: .image(Data([9]), mediaType: "image/png"))
+        let first = Message.user("第一个问题", attachments: [earlier])
+        let conversation = Conversation(connectionID: connection.id, modelID: "deepseek-flash")
+        await store.saveUserMessage(first, attachments: [earlier], in: conversation)
+
+        let adapter = ScriptedAdapter([[.event(.textDelta("好")), .event(.finished(.stop))]])
+        let input = TurnInput(
+            conversation: conversation,
+            connection: connection,
+            apiKey: "sk-test",
+            systemPrompt: "",
+            history: [first, Message(role: .assistant, content: [ContentBlock(.text("答"))])],
+            userMessage: .user("再看这个", attachments: [now]),
+            attachments: [now]
+        )
+        _ = await collect(runner(adapter).run(input))
+
+        let request = try #require(adapter.requests.first)
+        #expect(request.attachments == [earlier.id: earlier, now.id: now])
+        #expect(await store.attachments(in: conversation.id) == [earlier, now])
     }
 
     @Test func pauseTurnSendsTheAnswerSoFarBackAndContinues() async throws {

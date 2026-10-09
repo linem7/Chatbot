@@ -21,7 +21,9 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
 
     // MARK: MessageStore
 
-    public func saveUserMessage(_ message: Message, in conversation: Conversation) async throws {
+    public func saveUserMessage(_ message: Message, attachments: [Attachment], in conversation: Conversation) async throws {
+        // 附件副本先写文件，再在同一个事务里写 message 和 attachment 行
+        let storedFiles = try attachments.map { try writeCopy(of: $0, conversationID: conversation.id) }
         try await database.write { db in
             if try Self.conversationExists(conversation.id, db) {
                 try Self.touch(conversation.id, at: message.createdAt, db)
@@ -32,6 +34,15 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
                 try Self.insert(conversation, db)
             }
             try Self.upsert(message, conversationID: conversation.id, db)
+            for (attachment, storedFile) in zip(attachments, storedFiles) {
+                try db.execute(
+                    sql: """
+                        INSERT OR IGNORE INTO attachment (id, messageID, kind, originalName, storedFile)
+                        VALUES (?, ?, ?, ?, ?)
+                        """,
+                    arguments: [attachment.id.uuidString, message.id.uuidString, attachment.kind.rawValue, attachment.originalName, storedFile]
+                )
+            }
         }
     }
 
@@ -40,6 +51,61 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
             try Self.touch(conversationID, at: message.createdAt, db)
             try Self.upsert(message, conversationID: conversationID, db)
         }
+    }
+
+    public func attachments(in conversationID: UUID) async throws -> [Attachment] {
+        let rows = try await database.read { db in
+            try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT attachment.* FROM attachment
+                    JOIN message ON message.id = attachment.messageID
+                    WHERE message.conversationID = ?
+                    ORDER BY message.seq, attachment.rowid
+                    """,
+                arguments: [conversationID.uuidString]
+            )
+        }
+        let folder = attachmentsDirectory.appendingPathComponent(conversationID.uuidString, isDirectory: true)
+        return rows.compactMap { row in
+            let storedFile: String = row["storedFile"]
+            let kindValue: String = row["kind"]
+            guard let id = UUID(uuidString: row["id"]),
+                  let kind = Attachment.Kind(rawValue: kindValue),
+                  // 副本文件丢了就略过这个附件
+                  let data = try? Data(contentsOf: folder.appendingPathComponent(storedFile))
+            else { return nil }
+            let content: Attachment.Content
+            switch kind {
+            case .image:
+                content = .image(data, mediaType: storedFile.hasSuffix(".png") ? "image/png" : "image/jpeg")
+            case .pdf, .text:
+                content = .text(String(decoding: data, as: UTF8.self))
+            }
+            return Attachment(id: id, kind: kind, originalName: row["originalName"], content: content)
+        }
+    }
+
+    /// 把附件副本写到 `attachments/<conversationID>/`，返回文件名。已经存在时不重写（Retry）。
+    /// 图片存压缩后的版本，PDF 和文本文件存抽出的文字（SPEC §4）。
+    private func writeCopy(of attachment: Attachment, conversationID: UUID) throws -> String {
+        let folder = attachmentsDirectory.appendingPathComponent(conversationID.uuidString, isDirectory: true)
+        let data: Data
+        let fileName: String
+        switch attachment.content {
+        case .image(let imageData, let mediaType):
+            data = imageData
+            fileName = attachment.id.uuidString + (mediaType == "image/png" ? ".png" : ".jpg")
+        case .text(let text):
+            data = Data(text.utf8)
+            fileName = attachment.id.uuidString + ".txt"
+        }
+        let url = folder.appendingPathComponent(fileName)
+        if !FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+        }
+        return fileName
     }
 
     // MARK: 读取
@@ -208,7 +274,8 @@ extension HistoryStore {
                 t.column("createdAt", .double).notNull()
                 t.uniqueKey(["conversationID", "seq"])
             }
-            // 附件在 #21 里使用
+            // storedFile 是 attachments/<conversationID>/ 下的文件名；图片存压缩后的版本，PDF 和文本存抽出的文字，
+            // 所以 extractedTextFile 目前不用
             try db.create(table: "attachment") { t in
                 t.primaryKey("id", .text)
                 t.column("messageID", .text).notNull().indexed()

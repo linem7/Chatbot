@@ -126,6 +126,31 @@ struct HistoryStoreTests {
         #expect(try await store.conversations().count == 1)
     }
 
+    @Test func attachmentCopiesSurviveReopeningAndRetry() async throws {
+        let conversation = conversation()
+        let image = Attachment(kind: .image, originalName: "截图.png", content: .image(Data([1, 2, 3]), mediaType: "image/png"))
+        let photo = Attachment(kind: .image, originalName: "照片.heic", content: .image(Data([4, 5]), mediaType: "image/jpeg"))
+        let pdf = Attachment(kind: .pdf, originalName: "论文.pdf", content: .text("抽出的文字"))
+        let code = Attachment(kind: .text, originalName: "main.swift", content: .text("print(1)"))
+        let question = Message.user("看看", attachments: [image, photo, pdf, code])
+
+        do {
+            let store = try openStore()
+            try await store.saveUserMessage(question, attachments: [image, photo, pdf, code], in: conversation)
+            // Retry：同一条用户 Message 再保存一次，附件不会重复
+            try await store.saveUserMessage(question, attachments: [image, photo, pdf, code], in: conversation)
+        }
+
+        let reopened = try openStore()
+        #expect(try await reopened.attachments(in: conversation.id) == [image, photo, pdf, code])
+        #expect(try await reopened.messages(in: conversation.id) == [question])
+        // 附件副本在 attachments/<conversationID>/ 下，随 Conversation 一起删除
+        try await reopened.deleteConversation(conversation.id)
+        #expect(try await reopened.attachments(in: conversation.id).isEmpty)
+        let folder = directory.appendingPathComponent("attachments/\(conversation.id.uuidString)")
+        #expect(!FileManager.default.fileExists(atPath: folder.path))
+    }
+
     @Test func conversationsAreSortedByLastMessageNewestFirst() async throws {
         let store = try openStore()
         let old = try await saveExchange(store, question: "旧", answer: "a", at: Date(timeIntervalSince1970: 1_000))
