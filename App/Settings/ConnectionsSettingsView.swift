@@ -53,6 +53,8 @@ struct ConnectionsSettingsView: View {
                     selection = connections.connections.first?.id
                     // Default Model 跟着 Connection 一起没了：到通用页重新选
                     if deletedDefaultModel, !connections.connections.isEmpty { navigation.tab = .general }
+                } onDefaultModelRemoved: {
+                    navigation.tab = .general
                 }
                 .id(binding.wrappedValue.id)
             } else {
@@ -170,6 +172,8 @@ private struct ConnectionEditor: View {
     let onSaved: (UUID) -> Void
     /// 参数：被删掉的 Connection 里是否有 Default Model。
     let onDeleted: (Bool) -> Void
+    /// 删掉的手动 Model 正好是 Default Model。
+    let onDefaultModelRemoved: () -> Void
 
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -306,6 +310,11 @@ private struct ConnectionEditor: View {
         draft.models.removeAll { $0.id == id }
         draft.manualModelIDs.removeAll { $0 == id }
         persistModelsIfSaved()
+        // 删掉的正好是 Default Model：和删除 Connection 时一样，清空并到通用页重新选（SPEC §9）
+        if !draft.isNew, chat.connections.defaultModel == ModelRef(connectionID: draft.id, modelID: id) {
+            chat.connections.defaultModel = nil
+            onDefaultModelRemoved()
+        }
     }
 
     private func persistModelsIfSaved() {

@@ -19,7 +19,9 @@ step "检查环境"
 [[ "$(uname)" == "Darwin" ]] || fail "只能在 macOS 上运行。"
 command -v xcodebuild >/dev/null || fail "找不到 xcodebuild：请安装 Xcode 26，然后运行 sudo xcode-select -s /Applications/Xcode.app"
 command -v xcodegen >/dev/null || fail "找不到 xcodegen：请先运行 brew install xcodegen"
-security find-identity -v -p codesigning | grep -q '"Chatbot Self-Signed"' \
+# 先把输出存下来再查：直接接 grep -q 的话，grep 提前退出会让 security 收到 SIGPIPE，在 pipefail 下误报失败
+identities="$(security find-identity -v -p codesigning)" || fail "读取钥匙串里的签名证书失败。"
+grep -q '"Chatbot Self-Signed"' <<<"$identities" \
     || fail "钥匙串里没有能用来签名的证书「Chatbot Self-Signed」：按 README「创建自签名证书」做一次。"
 
 step "生成工程"
@@ -33,7 +35,8 @@ xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Release -de
 
 step "退出正在运行的 Chatbot"
 if pgrep -x Chatbot >/dev/null; then
-    # 正在生成的回答会以「已中断」保存，app 最多等 3 秒
+    # 正在生成的回答会以「已中断」保存，app 最多等 3 秒。
+    # 第一次运行时 macOS 可能会询问是否允许终端控制 Chatbot；拒绝的话下面会提示手动退出
     osascript -e 'tell application id "com.linem7.Chatbot" to quit' >/dev/null 2>&1 || true
     for _ in 1 2 3 4 5 6 7 8 9 10; do
         pgrep -x Chatbot >/dev/null || break

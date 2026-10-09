@@ -126,6 +126,8 @@ ditto build/Build/Products/Release/Chatbot.app /Applications/Chatbot.app
 rm -rf /Applications/Chatbot.app
 rm -rf ~/Library/Application\ Support/com.linem7.Chatbot     # 历史和附件副本
 defaults delete com.linem7.Chatbot                            # 设置
+rm -rf ~/Library/Caches/com.linem7.Chatbot                    # 缓存
+rm -rf ~/Library/HTTPStorages/com.linem7.Chatbot              # 网络请求的存储
 # 钥匙串里的 API key：每个 Connection 一条，删到没有为止
 while security delete-generic-password -s com.linem7.Chatbot.apikey >/dev/null 2>&1; do :; done
 ```
@@ -137,6 +139,7 @@ while security delete-generic-password -s com.linem7.Chatbot.apikey >/dev/null 2
 - **构建时报找不到签名身份「Chatbot Self-Signed」**：证书没有建好，或者没有设成「始终信任」。按上面「创建自签名证书」检查，`security find-identity -v -p codesigning` 里要能看到它。
 - **每次重新安装后，钥匙串都要求授权**：说明签名身份变了，例如重建了证书，或者没用脚本、而是用 Xcode 的「Sign to Run Locally」构建的。选「始终允许」一次即可；以后一直用同一张证书构建。
 - **按 option+space 没反应**：可能和系统快捷键冲突（启动时会提示），也可能和 ChatGPT 等别的 app 冲突（检测不到）。在设置的「通用」页换一个 Hotkey。
+- **运行脚本时弹出「“终端”想要控制“Chatbot”」**：这是 macOS 的自动化授权，脚本要用它退出正在运行的旧版本。点「允许」即可。如果点了「不允许」，脚本会停下来，提示你从菜单栏手动退出 Chatbot，退出后再运行一次就行；以后想改，可以到「系统设置 › 隐私与安全性 › 自动化」里调整。
 
 只跑核心逻辑的测试：
 
