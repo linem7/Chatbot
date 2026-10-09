@@ -92,7 +92,10 @@ public struct TurnRunner: Sendable {
         let webSearch = input.conversation.webSearchEnabled && (model?.capabilities.webSearch ?? false)
 
         do {
-            try await store.saveUserMessage(input.userMessage, conversationID: input.conversation.id)
+            let store = self.store
+            try await Self.ignoringCancellation {
+                try await store.saveUserMessage(input.userMessage, conversationID: input.conversation.id)
+            }
 
             var continuations = 0
             while true {
@@ -133,8 +136,18 @@ public struct TurnRunner: Sendable {
         }
 
         // 落库失败不影响界面上已经显示的回答
-        try? await store.saveAssistantMessage(answer, conversationID: input.conversation.id)
+        let store = self.store
+        let finalAnswer = answer
+        try? await Self.ignoringCancellation {
+            try await store.saveAssistantMessage(finalAnswer, conversationID: input.conversation.id)
+        }
         return answer
+    }
+
+    /// 取消之后仍然要落库（MessageStore 的约定）：放进非结构化的 Task 里执行，不继承当前 Task 的取消状态。
+    /// GRDB 的异步 `write` 在已取消的 Task 里会直接抛 `CancellationError`。
+    private static func ignoringCancellation(_ operation: @escaping @Sendable () async throws -> Void) async throws {
+        try await Task { try await operation() }.value
     }
 
     private static func apply(_ event: ModelEvent, to answer: inout Message) {

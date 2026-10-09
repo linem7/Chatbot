@@ -55,23 +55,27 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
 
         var finishReason: FinishReason?
         var sawDone = false
-        for try await event in response.body.sseEvents() {
-            if event.data == "[DONE]" {
-                sawDone = true
-                break
+        do {
+            for try await event in response.body.sseEvents() {
+                if event.data == "[DONE]" {
+                    sawDone = true
+                    break
+                }
+                // 宽松解码：看不懂的 chunk 直接跳过
+                guard let chunk = try? JSONDecoder().decode(StreamChunk.self, from: Data(event.data.utf8)) else { continue }
+                if let error = chunk.error {
+                    throw ChatError.providerError(error.message ?? event.data)
+                }
+                guard let choice = chunk.choices?.first(where: { ($0.index ?? 0) == 0 }) else { continue }
+                if let content = choice.delta?.content, !content.isEmpty {
+                    continuation.yield(.textDelta(content))
+                }
+                if let raw = choice.finishReason {
+                    finishReason = try Self.finishReason(raw)
+                }
             }
-            // 宽松解码：看不懂的 chunk 直接跳过
-            guard let chunk = try? JSONDecoder().decode(StreamChunk.self, from: Data(event.data.utf8)) else { continue }
-            if let error = chunk.error {
-                throw ChatError.providerError(error.message ?? event.data)
-            }
-            guard let choice = chunk.choices?.first(where: { ($0.index ?? 0) == 0 }) else { continue }
-            if let content = choice.delta?.content, !content.isEmpty {
-                continuation.yield(.textDelta(content))
-            }
-            if let raw = choice.finishReason {
-                finishReason = try Self.finishReason(raw)
-            }
+        } catch where finishReason != nil && !(error is CancellationError) {
+            // finish_reason 已经到了，之后（[DONE] 之前）连接断开：回答是完整的，按正常结束处理
         }
         try Task.checkCancellation()
 

@@ -7,6 +7,8 @@ import Testing
 final class StubTransport: HTTPTransport {
     enum Reply: Sendable {
         case response(statusCode: Int, headers: [String: String], body: [UInt8])
+        /// 先返回 200 和这段 body，然后连接断开
+        case truncated(body: [UInt8], error: ChatError)
         case failure(ChatError)
     }
 
@@ -36,6 +38,12 @@ final class StubTransport: HTTPTransport {
                 continuation.finish()
             }
             return HTTPResponse(statusCode: statusCode, headers: headers, body: stream)
+        case .truncated(let body, let error):
+            let stream = AsyncThrowingStream<UInt8, any Error> { continuation in
+                for byte in body { continuation.yield(byte) }
+                continuation.finish(throwing: error)
+            }
+            return HTTPResponse(statusCode: 200, headers: [:], body: stream)
         }
     }
 }

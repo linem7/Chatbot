@@ -94,6 +94,19 @@ struct OpenAICompatibleAdapterTests {
         }
     }
 
+    @Test func disconnectAfterFinishReasonIsANormalEnd() async throws {
+        // 构造的流：finish_reason 已经到了，[DONE] 之前连接断开，回答是完整的
+        let body = chunk("Hi") + chunk(nil, finishReason: "stop")
+        let events = try await collect(StubTransport(.truncated(body: Array(body.utf8), error: .network)))
+        #expect(events == [.textDelta("Hi"), .finished(.stop)])
+    }
+
+    @Test func disconnectBeforeFinishReasonIsNetworkError() async throws {
+        await #expect(throws: ChatError.network) {
+            try await collect(StubTransport(.truncated(body: Array(chunk("Hi").utf8), error: .network)))
+        }
+    }
+
     @Test func errorObjectInsideStreamIsProviderError() async throws {
         // 构造的流：OpenAI 兼容服务有时在流中途发一个 error 对象
         let body = chunk("Hi") + "data: {\"error\": {\"message\": \"boom\", \"type\": \"server_error\"}}\n\n"

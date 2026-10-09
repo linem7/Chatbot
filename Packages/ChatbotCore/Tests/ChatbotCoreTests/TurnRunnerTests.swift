@@ -145,6 +145,35 @@ struct TurnRunnerTests {
         #expect(saved.markdownText == "Hi")
     }
 
+    @Test func cancelledTurnIsStillSavedByAStoreThatRejectsCancelledTasks() async throws {
+        let store = CancellationCheckingStore()
+        let adapter = ScriptedAdapter([[.event(.textDelta("Hi")), .hang]])
+        let input = input()
+        let handle = TurnRunner(store: store, makeAdapter: { _ in adapter }).run(input)
+
+        var updates: [TurnUpdate] = []
+        for await update in handle.updates {
+            updates.append(update)
+            if updates.count == 1 { handle.cancel() }
+        }
+
+        let final = try finalMessage(updates)
+        #expect(final.status == .interrupted)
+        #expect(store.messages == [input.userMessage, final])
+    }
+
+    @Test func userMessageIsSavedEvenIfTheTurnIsCancelledImmediately() async throws {
+        let store = CancellationCheckingStore()
+        let adapter = ScriptedAdapter([[.hang]])
+        let input = input()
+        let handle = TurnRunner(store: store, makeAdapter: { _ in adapter }).run(input)
+        handle.cancel()
+
+        let final = try finalMessage(await collect(handle))
+        #expect(final.status == .interrupted)
+        #expect(store.messages == [input.userMessage, final])
+    }
+
     private func waitUntil(_ condition: @Sendable () async -> Bool) async throws {
         for _ in 0..<200 {
             if await condition() { return }
