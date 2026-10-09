@@ -25,13 +25,20 @@
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
 - v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
 - 2026-10-09 应用户要求，仓库最终改为 **public**（来回改过几次），这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。GitHub Pages 已从 `gh-pages` 分支重新开启。
-- **2026-10-09 v1 实现完成**：实现 ticket #17–#25 全部关闭，PR 是 #26–#41。**下一步是用户在 Mac 上按 #39（真机验证清单）逐项验证**，发现的问题再开 issue。
-- 实现阶段用户亲自定的几条，都已经写进文档，以文档为准：
-  - 其他 app 的 Hotkey 冲突检测不到，只给静态提示：SPEC §2.1；
-  - 生成中按 ⌘N 或切换 Model，先停止当前回答（保留为 Interrupted）再新开：SPEC §2.4、§3；
-  - Claude（和 Gemini）的思考「能关就关」，关不掉的压到最低档：ADR-0002；
-  - system prompt 的当前日期由 app 在发送时加在最前面，不在可编辑文本里：SPEC §3、ARCHITECTURE §5.1；
-  - 在 Main Window 里继续对话，是把对话装回 Quick Panel 继续：SPEC §8。
+- **2026-10-09 v1 实现完成**：实现 ticket #17–#25 全部关闭，PR 是 #26–#38、#40、#41（#39 是真机验证清单 issue）。**下一步是用户在 Mac 上按 #39 逐项验证**，发现的问题再开 issue。
+- 实现阶段新定的几条，都已经写进文档，以文档为准：
+  - 用户本人定的：
+    - 其他 app 的 Hotkey 冲突检测不到，只给静态提示：SPEC §2.1；
+    - 生成中按 ⌘N，先停止当前回答（保留为 Interrupted）再新开：SPEC §2.4；
+    - Claude 的思考「能关就关」，关不掉的压到最低档：ADR-0002；
+    - system prompt 的当前日期由 app 在发送时加在最前面，不在可编辑文本里：SPEC §3、ARCHITECTURE §5.1；
+    - 在 Main Window 里继续对话，是把对话装回 Quick Panel 继续：SPEC §8。
+  - lead 定的，或者按用户的原则推出来的：
+    - 生成中切换 Model 也先停止再切换（同 ⌘N）：SPEC §3；
+    - Sonnet 5.5 用 `thinking: between_tools` 关闭思考：ADR-0002、ARCHITECTURE §3.2；
+    - Gemini 的思考档位和能力来自内置表 `GeminiModelTable`：ADR-0002、ARCHITECTURE §3.2；
+    - 错误按钮表里 `authentication` 也给「重试」：SPEC §7。
+- v1 有意不建 App 的测试 target：ChatStore 等 App 侧逻辑目前靠 #39 的真机清单验证，v1 之后再考虑补测试。
 
 ## 偏好补充
 
