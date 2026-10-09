@@ -12,10 +12,11 @@
 | 工程 | XcodeGen：仓库里只提交 `project.yml`，`.xcodeproj` 加入 `.gitignore` |
 | 测试 | Swift Testing；`ChatbotCore` 可以用 `swift test` 单独运行 |
 | 依赖（SPM） | `sindresorhus/KeyboardShortcuts`、`groue/GRDB.swift`、`gonzalezreal/swift-markdown-ui`，另加一个代码高亮器（见 §8） |
-| 不引入 | 任何 LLM SDK、SSE 库、Sparkle |
+| 不引入 | 任何 LLM SDK、SSE 库、Sparkle 等更新框架 |
 | bundle id | `com.linem7.Chatbot` |
-| 签名 | 自签名证书，本地和 CI 用同一张，不做公证（ADR-0005） |
-| CI | GitHub Actions macOS runner：push 和 PR 时构建并测试；推送 `v*` tag 时构建、签名，并把 zip 上传到 GitHub Release |
+| 签名 | 本机构建时用一张固定的自签名证书，不做公证（ADR-0005） |
+| CI | GitHub Actions macOS runner，只在 PR 时构建并跑测试。私有仓库的 macOS runner 按 10 倍消耗免费额度，所以 push 到 main 时不跑。CI 不签名，也不发布 |
+| 分发 | v1 只自用：在本机构建后安装。不发 GitHub Release，也不做更新检查 |
 | 日志 | 只用 `os.Logger`，不记录 key 和对话内容，不做远程上报 |
 
 ## 2. 模块划分
@@ -28,7 +29,7 @@ App/                         # app target「Chatbot」：界面和系统集成
   QuickPanel/                # NSPanel 子类、面板控制器、SwiftUI 视图（聊天窗式）
   MainWindow/                # 历史列表、搜索、Conversation 详情
   Settings/                  # 通用 / Connection / 高级三个标签页
-  System/                    # Hotkey、Keychain、开机启动、更新检查、剪贴板和拖拽的接入
+  System/                    # Hotkey、Keychain、开机启动、剪贴板和拖拽的接入
   Rendering/                 # MarkdownUI 主题、代码高亮、Citation 角标、Gemini 搜索建议的 WebView
 Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测试
   Domain/                    # Connection、Model、ModelCapabilities、Conversation、Message、ContentBlock、ChatError
@@ -151,30 +152,24 @@ message_fts(FTS5，索引 conversation.title 和 message.plainText)
   - 按鼠标所在的屏幕定位。
 - **菜单栏**：使用 `MenuBarExtra`。图标的三种状态（空闲、生成中、有未读）由 store 驱动。
 - **开机启动**：`SMAppService.mainApp`。
-- **更新检查**：每天请求一次 GitHub Releases 的 latest 接口，和当前版本号比较。
 - **Gemini 搜索建议**：在回答下方放一个小的 `WKWebView`，加载 `renderedContent`。
 
 ## 8. 实现前需要核实的事
 
 1. **MarkdownUI 的维护状态和高亮器选择**：确认 `swift-markdown-ui` 当前是否仍在维护（作者可能已转向后继项目），以及它是否支持流式重绘时的性能。然后选一个代码高亮器（例如基于 highlight.js 的 HighlightSwift，或 Splash），确认两者能通过 MarkdownUI 的 `CodeSyntaxHighlighter` 接起来。
-2. **仓库是私有的，会影响分发和更新**：
-   - 私有仓库的 GitHub Releases 只有有权限的人能下载；
-   - 不带认证的更新检查也读不到 latest release；
-   - 私有仓库的 macOS runner 按 10 倍消耗免费分钟数。
-   要么在发布前把仓库公开，要么只自用，并调整更新检查的做法。
-3. **Gemini**：
+2. **Gemini**：
    - 哪些模型无法完全关闭思考；
    - 流中途出错时的格式；
    - `functionCall` 会不会被拆到多个 chunk 里；
    - `groundingSupports` 的偏移单位是字节还是字符（文档前后不一致）。
-4. **Hotkey 和面板**（`hotkey-and-panel.md` §6，需要在真机上验证）：
+3. **Hotkey 和面板**（`hotkey-and-panel.md` §6，需要在真机上验证）：
    - 非激活面板里 SwiftUI 输入框第一次能否可靠获得焦点；
    - 全屏 app 上方用 `.floating` 层级是否足够。
-5. **DeepSeek**：关闭思考后，确认 `deepseek-flash` 和 `deepseek-v4-pro` 都能接受图片，以 `/models` 返回的结果为准。
+4. **DeepSeek**：关闭思考后，确认 `deepseek-flash` 和 `deepseek-v4-pro` 都能接受图片，以 `/models` 返回的结果为准。
 
 ## 9. 建议的实现顺序（用来拆分实现 ticket）
 
-1. **工程骨架**：`project.yml`、App 和 ChatbotCore、CI 构建测试、签名配置。
+1. **工程骨架**：`project.yml`、App 和 ChatbotCore、PR 时的 CI 构建测试、本机自签名配置。
 2. **核心链路**：Domain → SSE 解析器 → OpenAI 兼容 adapter（DeepSeek）→ TurnRunner。用 fixture 测试。
 3. **最小可用版本**：菜单栏 + Hotkey + Quick Panel（聊天窗式）+ 流式回答 + Markdown 渲染。Connection 设置先只支持 DeepSeek。
 4. **存储**：GRDB 历史、标题生成、30 天清理、Main Window 的列表和全文搜索。
@@ -182,4 +177,4 @@ message_fts(FTS5，索引 conversation.title 和 message.plainText)
 6. **设置完整化**：三个标签页、Connection 模板、首次启动引导、开机启动。
 7. **Anthropic adapter**，包括 Web Search、Citation、`pause_turn`。
 8. **Gemini adapter**，包括 google_search 和搜索建议的 WebView。
-9. **错误展示的完善、更新检查、发布流程**。
+9. **错误展示的完善**，以及本机打包安装的步骤说明。
