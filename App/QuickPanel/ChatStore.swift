@@ -8,7 +8,7 @@ import Observation
 @Observable
 final class ChatStore {
     /// 距离上次 Turn 结束不到这个时长，唤起面板时接着上一个 Conversation（SPEC §2.3）。
-    static let continuationWindow: TimeInterval = 10 * 60
+    nonisolated static let continuationWindow: TimeInterval = 10 * 60
 
     var draft = ""
     private(set) var title = ""
