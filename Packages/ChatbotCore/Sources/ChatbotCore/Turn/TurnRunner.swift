@@ -95,6 +95,7 @@ public struct TurnRunner: Sendable {
 
     private func execute(_ input: TurnInput, onUpdate: (Message) -> Void) async -> Message {
         var answer = Message(role: .assistant, status: .streaming, content: [])
+        var builder = AnswerBuilder(provider: input.connection.provider)
         let adapter = makeAdapter(input.connection)
         let model = input.connection.models.first { $0.id == input.conversation.modelID }
         let webSearch = input.conversation.webSearchEnabled && (model?.capabilities.webSearch ?? false)
@@ -126,11 +127,12 @@ public struct TurnRunner: Sendable {
                 )
 
                 var finishReason: FinishReason?
+                builder.beginCall(answer)
                 for try await event in adapter.stream(request) {
                     if case .finished(let reason) = event {
                         finishReason = reason
                     } else {
-                        Self.apply(event, to: &answer)
+                        builder.apply(event, to: &answer)
                         onUpdate(answer)
                     }
                 }
@@ -176,22 +178,5 @@ public struct TurnRunner: Sendable {
     /// GRDB 的异步 `write` 在已取消的 Task 里会直接抛 `CancellationError`。
     private static func ignoringCancellation(_ operation: @escaping @Sendable () async throws -> Void) async throws {
         try await Task { try await operation() }.value
-    }
-
-    private static func apply(_ event: ModelEvent, to answer: inout Message) {
-        switch event {
-        case .textDelta(let delta):
-            if let last = answer.content.indices.last, case .text(let text, let citations) = answer.content[last].kind {
-                answer.content[last].kind = .text(text + delta, citations: citations)
-            } else {
-                answer.content.append(ContentBlock(.text(delta)))
-            }
-        case .toolCallStarted, .toolCallArgumentsDelta, .toolCallCompleted,
-             .webSearchStarted, .citation, .providerData:
-            // Web Search、Citation 和不透明数据在 #23、#24 里接入；v1 没有 app 侧工具
-            break
-        case .finished:
-            break
-        }
     }
 }

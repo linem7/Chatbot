@@ -78,13 +78,21 @@ enum ModelEvent {
 | | OpenAI 兼容（DeepSeek 等） | Anthropic Messages | Gemini `generateContent` |
 |---|---|---|---|
 | 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST /v1/messages` | `POST /v1beta/models/{m}:streamGenerateContent?alt=sse` |
-| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | 不发 `thinking` | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
+| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | Model 能关（capabilities 的 `thinking.types.disabled`）就发 `thinking: disabled`，关不掉的（Opus 5.5、Sonnet 5.5、Fable）不发；支持时都发 `output_config.effort: "low"`。思考块不展示，原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
 | system prompt | `role: "system"` 消息 | 顶层 `system` | 顶层 `systemInstruction` |
 | 图片 | `image_url` + base64 data URL | `image` block，base64 | `inlineData`，base64 |
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |
 | 结束标记 | `data: [DONE]`；DeepSeek 的 usage 挂在最后一个内容 chunk 上（v1 不使用） | `event: message_stop`；流中可能出现 `event: error` | 带 `finishReason` 的 chunk 加 EOF |
-| 必须原样回传的数据 | 无（思考已关闭） | `server_tool_use`、`web_search_tool_result`（含 `encrypted_content`） | `thoughtSignature`（必须留在原来的 Part 上） |
-| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models` 的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported` | 内置表（按模型名判断），接口只提供 token 上限 |
+| 必须原样回传的数据 | 无（思考已关闭） | 整串原生内容块：`thinking`（含 `signature`）、`server_tool_use`、`web_search_tool_result`（含 `encrypted_content`）、带 `citations` 的 `text`（含 `encrypted_index`） | `thoughtSignature`（必须留在原来的 Part 上） |
+| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models`（分页）的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported`；capabilities 原文和 `max_tokens` 存进 ModelInfo，adapter 判断思考、effort 和 `max_tokens` 时用 | 内置表（按模型名判断），接口只提供 token 上限 |
+
+**Anthropic adapter 的实现要点**（#23）：
+- 请求：`POST {base}/v1/messages`，头部 `x-api-key` 和 `anthropic-version: 2023-06-01`。`max_tokens` 取 Model 报告的上限，最多 64000；不知道上限时用 16000。
+- Web Search 仍用 `web_search_20250305`（官方文档仍以它配 claude-opus-5-5 示例）。更新的版本走代码执行做动态过滤，更慢，响应里还会多出代码执行块。
+- 原样回传：流里每个完整的内容块通过 `providerData` 交给 TurnRunner，按顺序累积在 assistant Message 的第一个块 `opaque(.anthropic, [原生块…])` 里。complete 的回答（以及 `pause_turn` 续接时进行中的回答）逐字发回这一串；interrupted 或 failed 的回答里可能有不完整的工具块，只发文字。
+- Citation：adapter 在 text 块结束时按「这次调用输出的正文」给出 UTF-16 范围，TurnRunner 换算成所在 text 块里的偏移。
+- `stop_reason`：`refusal`（安全分类器拒答）报 `providerError`，不开服务端 fallback，因为 Conversation 的 Model 创建后不换；`model_context_window_exceeded` 按 `length` 处理。
+- 错误映射：401 → authentication；402（billing）和 429 → rateLimited；400 里的 "prompt is too long" → contextTooLong，其他 400、404、413 → invalidRequest；所有 5xx（含 529）→ overloaded；流中的 `event: error` 按 `error.type` 映射。
 
 **Model Capabilities 的来源优先级**：接口报告 > 内置表 > 保守默认。保守默认是「只支持文本和 tools，不支持图片，不支持搜索」。用户不能手动修改。
 

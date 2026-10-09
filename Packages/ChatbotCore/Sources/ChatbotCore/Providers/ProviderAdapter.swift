@@ -74,8 +74,10 @@ extension Provider {
         switch self {
         case .openAICompatible:
             OpenAICompatibleAdapter(transport: transport)
-        case .anthropic, .gemini:
-            // #23、#24 实现
+        case .anthropic:
+            AnthropicAdapter(transport: transport)
+        case .gemini:
+            // #24 实现
             UnimplementedAdapter(provider: self)
         }
     }

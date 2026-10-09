@@ -1,8 +1,10 @@
-// 调试用的命令行：用真实的 DeepSeek key 拉一次 Model 列表，再流式跑一次 Turn。
+// 调试用的命令行：用真实的 key 拉一次 Model 列表，再流式跑一次 Turn。
 //
 // 用法（在 Mac 上，仓库根目录）：
 //   DEEPSEEK_API_KEY=sk-... swift run --package-path Packages/ChatbotCore chatbot-debug "用一句话介绍你自己"
-// 可选环境变量 DEEPSEEK_MODEL 指定 Model，默认 deepseek-flash。
+//   ANTHROPIC_API_KEY=sk-ant-... swift run --package-path Packages/ChatbotCore chatbot-debug "今天东京天气怎样"
+// 两个 key 都设了时用 Anthropic。可选环境变量 DEEPSEEK_MODEL / ANTHROPIC_MODEL 指定 Model，
+// 默认 deepseek-flash / claude-opus-5-5。Anthropic 的 Model 支持时会开 Web Search，回答末尾列出 Citation。
 // 流式输出期间按 Ctrl-C 会直接结束进程。
 
 import ChatbotCore
@@ -19,15 +21,23 @@ func fail(_ message: String) -> Never {
 }
 
 let environment = ProcessInfo.processInfo.environment
-guard let apiKey = environment["DEEPSEEK_API_KEY"], !apiKey.isEmpty else {
-    fail("请先设置环境变量 DEEPSEEK_API_KEY")
+var connection: Connection
+let apiKey: String
+let modelID: String
+if let key = environment["ANTHROPIC_API_KEY"], !key.isEmpty {
+    connection = .anthropic()
+    apiKey = key
+    modelID = environment["ANTHROPIC_MODEL"] ?? "claude-opus-5-5"
+} else if let key = environment["DEEPSEEK_API_KEY"], !key.isEmpty {
+    connection = .deepSeek()
+    apiKey = key
+    modelID = environment["DEEPSEEK_MODEL"] ?? "deepseek-flash"
+} else {
+    fail("请先设置环境变量 DEEPSEEK_API_KEY 或 ANTHROPIC_API_KEY")
 }
-let modelID = environment["DEEPSEEK_MODEL"] ?? "deepseek-flash"
 let prompt = CommandLine.arguments.dropFirst().joined(separator: " ")
 let question = prompt.isEmpty ? "用一句话介绍你自己。" : prompt
-
-var connection = Connection.deepSeek()
-let adapter = OpenAICompatibleAdapter()
+let adapter = connection.provider.makeAdapter()
 
 write("== GET /models\n")
 do {
@@ -61,6 +71,16 @@ for await update in handle.updates {
         printed = text
     case .finished(let message):
         write(message.markdownText.dropFirst(printed.count) + "\n")
+        for block in message.content {
+            switch block.kind {
+            case .webSearch(let query):
+                write("== 搜索：\(query)\n")
+            case .text(_, let citations):
+                for span in citations { write("== 引用：\(span.citation.title) \(span.citation.url)\n") }
+            default:
+                break
+            }
+        }
         write("== 状态：\(message.status)\n")
         if case .failed = message.status { exit(1) }
     }
