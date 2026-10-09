@@ -31,7 +31,7 @@
 - DeepSeek 的 API 没有原生搜索，所以用 DeepSeek 时不联网。
 
 ### 4. 多模型与本地历史
-- 支持三种 API 协议：OpenAI 兼容（包括 DeepSeek）、Anthropic、Google Gemini。用户自带 API key，key 存在系统钥匙串里。
+- 支持三种 API 协议：OpenAI 兼容（包括 DeepSeek）、Anthropic、Google Gemini。用户自带 API key，key 存在 macOS 的 Keychain 里。
 - 对话保存在本地，可以在主窗口里全文搜索。最后一条消息在 30 天前的对话会被自动删除。
 
 ## v1.0 明确不做
@@ -60,7 +60,7 @@
 
 ## 安装
 
-v1 只自用，不对外发布：在本机构建后安装。app 用一张固定的自签名证书签名，没有经过 Apple 公证（[ADR-0005](docs/adr/0005-self-signed-certificate-no-notarization.md)）。首次启动会打开设置，选择 DeepSeek 模板，粘贴 API key 即可开始使用。
+v1 只自用，不对外发布：在本机构建后安装。app 用一张固定的自签名证书签名，没有经过 Apple 公证（[ADR-0005](docs/adr/0005-self-signed-certificate-no-notarization.md)）。首次启动会打开 Settings 窗口，选择 DeepSeek 模板，粘贴 API key 即可开始使用。
 
 ### 准备
 
@@ -69,20 +69,36 @@ v1 只自用，不对外发布：在本机构建后安装。app 用一张固定�
 
 ### 创建自签名证书（只需做一次）
 
-API key 存在钥匙串里，钥匙串按签名身份判断访问权限。所以每次构建都要用**同一张**证书签名，否则重新构建后读 key 时会反复弹窗。
+API key 存在 Keychain 里，Keychain 按签名身份判断访问权限。所以每次构建都要用**同一张**证书签名，否则重新构建后读 key 时会反复弹窗。
 
-1. 打开「钥匙串访问」，菜单选「钥匙串访问 → 证书助理 → 创建证书…」。
-2. 名称填 `Chatbot Self-Signed`（必须和 `project.yml` 里的 `CODE_SIGN_IDENTITY` 一致），身份类型选「自签名根证书」，证书类型选「代码签名」。
-3. 勾选「让我覆盖这些默认值」，有效期填 `7300`（20 年），其余一路默认，钥匙串选「登录」。
-4. 在「登录」钥匙串里双击这张证书，展开「信任」，把「代码签名」设为「始终信任」，关闭窗口并输入密码确认。
-5. 在终端确认它能用于签名：
+1. 打开 **Keychain Access**。从 macOS 15 起，它不在 Applications › Utilities 里了，在 Terminal 里执行：
+
+   ```sh
+   open -a "Keychain Access"
+   ```
+
+   如果提示找不到，用完整路径：
+
+   ```sh
+   open "/System/Library/CoreServices/Applications/Keychain Access.app"
+   ```
+
+2. 在**屏幕顶部的菜单栏**（不是窗口里）点 **Keychain Access** 菜单，选 **Certificate Assistant › Create a Certificate…**。
+3. 在弹出的窗口里：
+   - **Name** 填 `Chatbot Self-Signed`（必须和 `project.yml` 里的 `CODE_SIGN_IDENTITY` 一致）；
+   - **Identity Type** 选 **Self-Signed Root**；
+   - **Certificate Type** 选 **Code Signing**；
+   - 勾选 **Let me override defaults**，点 **Continue**。
+4. **Validity Period (days)** 填 `7300`（20 年），之后的页面一路点 **Continue** 保持默认；问到存在哪个 keychain 时选 **login**，最后点 **Create**。
+5. 回到 Keychain Access 窗口，在左侧选 **login** keychain，在 **My Certificates**（或 **Certificates**）里双击 `Chatbot Self-Signed`。展开 **Trust**，把 **Code Signing** 设为 **Always Trust**，关闭窗口，输入登录密码确认。
+6. 在 Terminal 里确认它能用于签名：
 
    ```sh
    security find-identity -v -p codesigning
    ```
 
    输出里应该有一行 `"Chatbot Self-Signed"`。
-6. **备份**：在钥匙串里右键这张证书 →「导出」，存成 `.p12` 并设密码，放到安全的地方。私钥丢了就只能换证书，换证书后第一次读 key 会再弹一次钥匙串授权。
+7. **备份**：在 Keychain Access 里右键这张证书 → **Export "Chatbot Self-Signed"…**，格式选 **Personal Information Exchange (.p12)**，设一个密码，存到安全的地方。私钥丢了就只能换证书，换证书后第一次读 key 会再弹一次 Keychain 授权。
 
 ### 构建和安装
 
@@ -96,11 +112,11 @@ API key 存在钥匙串里，钥匙串按签名身份判断访问权限。所以
 
 装好之后，Chatbot 只出现在菜单栏，不出现在 Dock。第一次启动时：
 
-- 会自动打开设置的 Connection 页，并选好 DeepSeek 模板。粘贴 API key 后点「保存」，app 会拉取 Model 列表，这一步同时就是连接测试。
-- 会打开「开机时启动」。macOS 会弹一条「已添加后台项目」的系统通知，这是系统行为，不是 app 发的。
+- 会自动打开 Settings 窗口的 **Connections** 标签页，并选好 DeepSeek 模板。粘贴 API key 后点 **Save**，app 会拉取 Model 列表，这一步同时就是连接测试。
+- 会打开 **Launch at Login**。macOS 会弹一条 **Background Items Added** 的系统通知，这是系统行为，不是 app 发的。
 - 如果 option+space 已经被系统快捷键占用，会弹窗提示。
 
-本机构建的 app 没有隔离标记（quarantine），不会被 Gatekeeper 拦下。以后对外分发时，下载的人第一次打开需要到「系统设置 › 隐私与安全性」里点「仍要打开」（ADR-0005）。
+本机构建的 app 没有隔离标记（quarantine），不会被 Gatekeeper 拦下。以后对外分发时，下载的人第一次打开需要到 **System Settings › Privacy & Security** 里点 **Open Anyway**（ADR-0005）。
 
 手动构建的步骤（和脚本做的事一样）：
 
@@ -116,11 +132,11 @@ ditto build/Build/Products/Release/Chatbot.app /Applications/Chatbot.app
 
 ### 升级
 
-拉取最新代码后，再运行一次 `./scripts/install.sh`。证书没变，所以钥匙串不会再要求授权。如果还是弹了，选「始终允许」，之后就不会再弹。设置、历史和 key 都会保留。
+拉取最新代码后，再运行一次 `./scripts/install.sh`。证书没变，所以 Keychain 不会再要求授权。如果还是弹了，选 **Always Allow**，之后就不会再弹。设置、历史和 key 都会保留。
 
 ### 卸载
 
-先在设置的「通用」页关掉「开机时启动」，从菜单栏退出 Chatbot，再执行：
+先在 Settings 的 **General** 页关掉 **Launch at Login**，从菜单栏图标的菜单里选 **Quit Chatbot**，再执行：
 
 ```sh
 rm -rf /Applications/Chatbot.app
@@ -128,18 +144,18 @@ rm -rf ~/Library/Application\ Support/com.linem7.Chatbot     # 历史和附件�
 defaults delete com.linem7.Chatbot                            # 设置
 rm -rf ~/Library/Caches/com.linem7.Chatbot                    # 缓存
 rm -rf ~/Library/HTTPStorages/com.linem7.Chatbot              # 网络请求的存储
-# 钥匙串里的 API key：每个 Connection 一条，删到没有为止
+# Keychain 里的 API key：每个 Connection 一条，删到没有为止
 while security delete-generic-password -s com.linem7.Chatbot.apikey >/dev/null 2>&1; do :; done
 ```
 
-自签名证书如果不再需要，可以在「钥匙串访问」里删掉。
+自签名证书如果不再需要，可以在 Keychain Access 里删掉。
 
 ### 常见问题
 
-- **构建时报找不到签名身份「Chatbot Self-Signed」**：证书没有建好，或者没有设成「始终信任」。按上面「创建自签名证书」检查，`security find-identity -v -p codesigning` 里要能看到它。
-- **每次重新安装后，钥匙串都要求授权**：说明签名身份变了，例如重建了证书，或者没用脚本、而是用 Xcode 的「Sign to Run Locally」构建的。选「始终允许」一次即可；以后一直用同一张证书构建。
-- **按 option+space 没反应**：可能和系统快捷键冲突（启动时会提示），也可能和 ChatGPT 等别的 app 冲突（检测不到）。在设置的「通用」页换一个 Hotkey。
-- **运行脚本时弹出「“终端”想要控制“Chatbot”」**：这是 macOS 的自动化授权，脚本要用它退出正在运行的旧版本。点「允许」即可。如果点了「不允许」，脚本会停下来，提示你从菜单栏手动退出 Chatbot，退出后再运行一次就行；以后想改，可以到「系统设置 › 隐私与安全性 › 自动化」里调整。
+- **构建时报找不到签名身份 `Chatbot Self-Signed`**：证书没有建好，或者 **Code Signing** 没有设成 **Always Trust**。按上面「创建自签名证书」检查，`security find-identity -v -p codesigning` 里要能看到它。
+- **每次重新安装后，Keychain 都要求授权**：说明签名身份变了，例如重建了证书，或者没用脚本、而是用 Xcode 的 **Sign to Run Locally** 构建的。在弹窗里选 **Always Allow** 一次即可；以后一直用同一张证书构建。
+- **按 option+space 没反应**：可能和系统快捷键冲突（启动时会提示），也可能和 ChatGPT 等别的 app 冲突（检测不到）。在 Settings 的 **General** 页换一个 **Hotkey**。
+- **运行脚本时弹出 "Terminal" wants access to control "Chatbot"**：这是 macOS 的 Automation 授权，脚本要用它退出正在运行的旧版本。点 **Allow** 即可。如果点了 **Don't Allow**，脚本会停下来，提示你从菜单栏手动退出 Chatbot，退出后再运行一次就行；以后想改，可以到 **System Settings › Privacy & Security › Automation** 里调整。
 
 只跑核心逻辑的测试：
 

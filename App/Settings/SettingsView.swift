@@ -69,7 +69,7 @@ private struct GeneralSettingsView: View {
                 ))
                 if launchAtLogin.requiresApproval {
                     HStack {
-                        Text("Allow Chatbot in System Settings › General › Login Items.")
+                        Text("Allow Chatbot in System Settings › General › Login Items & Extensions.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         Spacer()

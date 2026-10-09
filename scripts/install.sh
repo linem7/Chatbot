@@ -20,16 +20,16 @@ step "检查环境"
 command -v xcodebuild >/dev/null || fail "找不到 xcodebuild：请安装 Xcode 26，然后运行 sudo xcode-select -s /Applications/Xcode.app"
 command -v xcodegen >/dev/null || fail "找不到 xcodegen：请先运行 brew install xcodegen"
 # 先把输出存下来再查：直接接 grep -q 的话，grep 提前退出会让 security 收到 SIGPIPE，在 pipefail 下误报失败
-identities="$(security find-identity -v -p codesigning)" || fail "读取钥匙串里的签名证书失败。"
+identities="$(security find-identity -v -p codesigning)" || fail "读取 Keychain 里的签名证书失败。"
 grep -q '"Chatbot Self-Signed"' <<<"$identities" \
-    || fail "钥匙串里没有能用来签名的证书「Chatbot Self-Signed」：按 README「创建自签名证书」做一次。"
+    || fail "Keychain 里没有能用来签名的证书 Chatbot Self-Signed：按 README「创建自签名证书」做一次。"
 
 step "生成工程"
 xcodegen generate --quiet || fail "xcodegen generate 失败，看上面的输出。"
 
 step "构建 Release（第一次要下载依赖，会慢一些）"
 xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Release -derivedDataPath build -quiet build \
-    || fail "构建失败，往上翻看 xcodebuild 的错误。签名相关的错误先检查证书是否设成了「始终信任」。"
+    || fail "构建失败，往上翻看 xcodebuild 的错误。签名相关的错误，先检查证书的 Code Signing 是否设成了 Always Trust。"
 [[ -d build/Build/Products/Release/Chatbot.app ]] \
     || fail "构建完成了，但找不到 build/Build/Products/Release/Chatbot.app。"
 
@@ -55,7 +55,7 @@ ditto build/Build/Products/Release/Chatbot.app /Applications/Chatbot.app \
 
 step "检查签名"
 codesign --verify --deep --strict /Applications/Chatbot.app \
-    || fail "签名校验失败：确认证书「Chatbot Self-Signed」的「代码签名」设成了「始终信任」。"
+    || fail "签名校验失败：在 Keychain Access 里确认证书 Chatbot Self-Signed 的 Code Signing 设成了 Always Trust。"
 
 step "启动"
 open /Applications/Chatbot.app || fail "启动失败：试试在访达里打开 /Applications/Chatbot.app。"
