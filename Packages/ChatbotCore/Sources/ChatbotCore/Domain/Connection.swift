@@ -41,6 +41,11 @@ public struct Connection: Codable, Sendable, Hashable, Identifiable {
         Connection(id: id, name: name, provider: .openAICompatible, baseURL: URL(string: "https://api.deepseek.com")!)
     }
 
+    /// Anthropic 模板：base URL `https://api.anthropic.com`，路径里的 `/v1` 由 adapter 加。
+    public static func anthropic(id: UUID = UUID(), name: String = "Anthropic") -> Connection {
+        Connection(id: id, name: name, provider: .anthropic, baseURL: URL(string: "https://api.anthropic.com")!)
+    }
+
     /// 是否是 DeepSeek 的官方接口。DeepSeek 需要一些非标准字段（例如关闭思考的 `thinking`）。
     var isDeepSeek: Bool {
         guard let host = baseURL.host?.lowercased() else { return false }
@@ -54,13 +59,26 @@ public struct ModelInfo: Codable, Sendable, Hashable, Identifiable {
     public var id: String
     public var displayName: String?
     public var contextWindow: Int?
+    /// 单次回答最多能输出的 token 数。Anthropic 的 `max_tokens` 是必填项，不能超过它。
+    public var maxOutputTokens: Int?
     public var capabilities: ModelCapabilities
+    /// 接口报告的能力原文，只由对应的 adapter 读取（例如 Anthropic 判断能否关闭思考、能否用 low effort）。
+    public var providerData: JSONValue?
 
-    public init(id: String, displayName: String? = nil, contextWindow: Int? = nil, capabilities: ModelCapabilities) {
+    public init(
+        id: String,
+        displayName: String? = nil,
+        contextWindow: Int? = nil,
+        maxOutputTokens: Int? = nil,
+        capabilities: ModelCapabilities,
+        providerData: JSONValue? = nil
+    ) {
         self.id = id
         self.displayName = displayName
         self.contextWindow = contextWindow
+        self.maxOutputTokens = maxOutputTokens
         self.capabilities = capabilities
+        self.providerData = providerData
     }
 }
 

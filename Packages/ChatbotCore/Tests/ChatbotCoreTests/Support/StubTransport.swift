@@ -12,11 +12,16 @@ final class StubTransport: HTTPTransport {
         case failure(ChatError)
     }
 
-    private let reply: Reply
+    /// 依次使用的回复；用完之后一直重复最后一个。
+    private let replies: Mutex<[Reply]>
     private let recorded = Mutex<[HTTPRequest]>([])
 
     init(_ reply: Reply) {
-        self.reply = reply
+        self.replies = Mutex([reply])
+    }
+
+    init(sequence: [Reply]) {
+        self.replies = Mutex(sequence)
     }
 
     convenience init(statusCode: Int = 200, headers: [String: String] = [:], body: String) {
@@ -29,6 +34,7 @@ final class StubTransport: HTTPTransport {
 
     func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         recorded.withLock { $0.append(request) }
+        let reply = replies.withLock { $0.count > 1 ? $0.removeFirst() : $0[0] }
         switch reply {
         case .failure(let error):
             throw error

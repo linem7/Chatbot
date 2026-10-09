@@ -41,4 +41,15 @@ public enum JSONValue: Codable, Sendable, Hashable {
         if case .string(let value) = self { return value }
         return nil
     }
+
+    public var boolValue: Bool? {
+        if case .bool(let value) = self { return value }
+        return nil
+    }
+
+    /// 对象的字段；不是对象或没有这个字段时返回 nil。可以链式访问：`json["a"]?["b"]`。
+    public subscript(key: String) -> JSONValue? {
+        if case .object(let fields) = self { return fields[key] }
+        return nil
+    }
 }
