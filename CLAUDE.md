@@ -1,6 +1,6 @@
 # Chatbot
 
-macOS 菜单栏 AI 助手，用原生 Swift + SwiftUI 开发。目前处于**规划阶段，还没有代码**。
+macOS 菜单栏 AI 助手，用原生 Swift + SwiftUI 开发。规划阶段已经完成，**还没有代码**。功能以 `docs/SPEC.md` 为准，实现方案以 `docs/ARCHITECTURE.md` 为准（其中 §8 是实现前要核实的事，§9 是建议的实现顺序）。
 
 ## 任务从哪来
 
