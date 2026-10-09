@@ -102,8 +102,8 @@ public struct TurnRunner: Sendable {
         var answer = Message(id: input.replacingAnswerID ?? UUID(), role: .assistant, status: .streaming, content: [])
         var builder = AnswerBuilder(provider: input.connection.provider)
         let adapter = makeAdapter(input.connection)
-        let model = input.connection.models.first { $0.id == input.conversation.modelID }
-        let webSearch = input.conversation.webSearchEnabled && (model?.capabilities.webSearch ?? false)
+        let webSearch = input.conversation.webSearchEnabled
+            && input.connection.capabilities(ofModel: input.conversation.modelID).webSearch
 
         do {
             let store = self.store

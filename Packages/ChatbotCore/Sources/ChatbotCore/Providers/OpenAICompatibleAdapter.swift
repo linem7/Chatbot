@@ -7,7 +7,10 @@ import Foundation
 ///   OpenRouter 发 `reasoning: {enabled: false}`，百炼发 `enable_thinking: false`；其他服务什么都不发。
 /// - 不发 DeepSeek 不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls`、`max_completion_tokens`、`logit_bias`），
 ///   也不用 `developer` role。
-/// - v1 只解码正文和 `finish_reason`；tool call 的增量暂不解码（v1 没有 app 侧工具）。
+/// - 平台的联网（ADR-0003，#54）：OpenRouter 在 tools 里加 `openrouter:web_search`，引用从流里的
+///   `delta.annotations[]`（`url_citation`）取；百炼发 `enable_search: true`，接口不返回来源。
+///   两者都没有可靠的「正在搜索」事件，所以不发 `webSearchStarted`。
+/// - 只解码正文、引用和 `finish_reason`；tool call 的增量暂不解码（v1 没有 app 侧工具）。
 public struct OpenAICompatibleAdapter: ProviderAdapter {
     private let transport: any HTTPTransport
 
@@ -42,7 +45,8 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
             guard let list = try? JSONDecoder().decode(ModelList.self, from: data) else {
                 throw ChatError.providerError("无法解析 Model 列表")
             }
-            return list.data.map(\.modelInfo)
+            let platform = connection.platform
+            return list.data.map { $0.modelInfo(platform: platform) }
         } catch {
             throw Self.normalize(error)
         }
@@ -56,6 +60,7 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
 
         var finishReason: FinishReason?
         var sawDone = false
+        var citations = URLCitations()
         do {
             for try await event in response.body.sseEvents() {
                 if event.data == "[DONE]" {
@@ -70,7 +75,9 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
                 guard let choice = chunk.choices?.first(where: { ($0.index ?? 0) == 0 }) else { continue }
                 if let content = choice.delta?.content, !content.isEmpty {
                     continuation.yield(.textDelta(content))
+                    citations.text += content
                 }
+                if let annotations = choice.delta?.annotations { citations.collect(annotations) }
                 if let raw = choice.finishReason {
                     finishReason = try Self.finishReason(raw)
                 }
@@ -80,6 +87,8 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
         }
         try Task.checkCancellation()
 
+        // 引用可能比它指向的正文先到，所以等这次调用的正文都收齐了再定位
+        for event in citations.events() { continuation.yield(event) }
         if let finishReason {
             continuation.yield(.finished(finishReason))
         } else if sawDone {
@@ -135,6 +144,14 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
             body.enableThinking = thinkingOnly ? nil : false
         case nil:
             break
+        }
+        // 平台的联网（ADR-0003）。request.webSearch 已经考虑了 Model 能力和这个 Conversation 的地球按钮
+        if request.webSearch, let platform = request.connection.platform, platform.supportsServerWebSearch {
+            switch platform {
+            case .openRouter: body.tools = [.init(type: "openrouter:web_search")]
+            case .bailian: body.enableSearch = true
+            case .deepSeek: break
+            }
         }
         return HTTPRequest(
             method: "POST",
@@ -247,6 +264,7 @@ private struct ChatRequestBody: Encodable {
         var enabled: Bool?
         var effort: String?
     }
+    struct ServerTool: Encodable { var type: String }
 
     var model: String
     var messages: [ChatMessage]
@@ -257,10 +275,15 @@ private struct ChatRequestBody: Encodable {
     var reasoning: Reasoning?
     /// 百炼
     var enableThinking: Bool?
+    /// OpenRouter 的联网：`[{"type": "openrouter:web_search"}]`
+    var tools: [ServerTool]?
+    /// 百炼的联网
+    var enableSearch: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case model, messages, stream, thinking, reasoning
+        case model, messages, stream, thinking, reasoning, tools
         case enableThinking = "enable_thinking"
+        case enableSearch = "enable_search"
     }
 }
 
@@ -317,7 +340,11 @@ private enum ContentPart: Encodable {
 
 private struct StreamChunk: Decodable {
     struct Choice: Decodable {
-        struct Delta: Decodable { var content: String? }
+        struct Delta: Decodable {
+            var content: String?
+            /// OpenRouter 联网时的引用。按 JSONValue 宽松解码：字段缺了或者格式不对，不能连累同一个 chunk 里的正文
+            var annotations: JSONValue?
+        }
         var index: Int?
         var delta: Delta?
         var finishReason: String?
@@ -345,28 +372,85 @@ private struct ErrorDetail: Decodable {
 
 private struct ModelList: Decodable {
     struct Entry: Decodable {
+        struct Architecture: Decodable {
+            var inputModalities: [String]?
+
+            enum CodingKeys: String, CodingKey {
+                case inputModalities = "input_modalities"
+            }
+        }
+
         var id: String
         var name: String?
         var contextWindow: Int?
+        /// OpenRouter 的写法
+        var contextLength: Int?
         var inputModalities: [String]?
+        /// OpenRouter 把 `input_modalities` 放在 `architecture` 里
+        var architecture: Architecture?
         /// OpenRouter 报告的思考选项（`mandatory`、`supported_efforts` 等），存进 providerData，关闭思考时用
         var reasoning: JSONValue?
 
         enum CodingKeys: String, CodingKey {
-            case id, name, reasoning
+            case id, name, reasoning, architecture
             case contextWindow = "context_window"
+            case contextLength = "context_length"
             case inputModalities = "input_modalities"
         }
 
-        /// 图片能力看 `input_modalities`，tools 视为支持，搜索一律不支持（ARCHITECTURE §3.2）。
-        /// 接口没报告 `input_modalities` 时用保守默认。
-        var modelInfo: ModelInfo {
+        /// 图片能力看 `input_modalities`（DeepSeek 在顶层，OpenRouter 在 `architecture` 里），接口没报告时用保守默认。
+        /// tools 视为支持。搜索看平台：OpenRouter（EU 端点除外）和百炼的所有模型都能联网，其他不支持（ADR-0003）。
+        func modelInfo(platform: Platform?) -> ModelInfo {
             var capabilities = ModelCapabilities.conservative
-            if let inputModalities { capabilities.imageInput = inputModalities.contains("image") }
+            if let modalities = inputModalities ?? architecture?.inputModalities {
+                capabilities.imageInput = modalities.contains("image")
+            }
+            capabilities.webSearch = platform?.supportsServerWebSearch ?? false
             let providerData: JSONValue? = reasoning.flatMap { $0 == .null ? nil : .object(["reasoning": $0]) }
-            return ModelInfo(id: id, displayName: name, contextWindow: contextWindow, capabilities: capabilities, providerData: providerData)
+            return ModelInfo(
+                id: id,
+                displayName: name,
+                contextWindow: contextWindow ?? contextLength,
+                capabilities: capabilities,
+                providerData: providerData
+            )
         }
     }
 
     var data: [Entry]
 }
+
+/// 一次调用里收到的 `url_citation` 引用。流结束、正文收齐之后再统一换算位置（见 `URLCitationLocator`）。
+private struct URLCitations {
+    /// 这次调用输出的全部正文
+    var text = ""
+    private var pending: [(url: URL, title: String?, start: Int?, end: Int?)] = []
+    private var seen: Set<String> = []
+
+    /// 宽松解码：只认 `type` 是 `url_citation`、带合法 URL 的；title、start_index、end_index 都可能没有（research §1.4）。
+    mutating func collect(_ annotations: JSONValue) {
+        guard case .array(let items) = annotations else { return }
+        for item in items where item["type"]?.stringValue == "url_citation" {
+            guard let citation = item["url_citation"], let raw = citation["url"]?.stringValue, let url = URL(string: raw) else { continue }
+            let start = citation["start_index"].flatMap(Self.int)
+            let end = citation["end_index"].flatMap(Self.int)
+            // 同一条引用可能在多个 chunk 里重复出现
+            guard seen.insert("\(raw)|\(start.map(String.init) ?? "")|\(end.map(String.init) ?? "")").inserted else { continue }
+            pending.append((url, citation["title"]?.stringValue, start, end))
+        }
+    }
+
+    func events() -> [ModelEvent] {
+        pending.map { citation in
+            let range = URLCitationLocator.range(start: citation.start, end: citation.end, url: citation.url.absoluteString, in: text)
+            let title = citation.title.flatMap { $0.isEmpty ? nil : $0 } ?? citation.url.host() ?? citation.url.absoluteString
+            return .citation(Citation(title: title, url: citation.url), textRange: range)
+        }
+    }
+
+    private static func int(_ value: JSONValue) -> Int? {
+        if case .number(let number) = value, number >= 0, number == number.rounded() { return Int(number) }
+        return nil
+    }
+}
+

@@ -54,7 +54,7 @@ extension ChatStore {
 
     private var currentModelCapabilities: ModelCapabilities? {
         guard let model = currentModel, let connection = connections.connection(id: model.connectionID) else { return nil }
-        return connection.models.first { $0.id == model.modelID }?.capabilities
+        return connection.capabilities(ofModel: model.modelID)
     }
 
     /// 草稿里有图片、而当前 Model 不接受图片时的提示。图片照样可以留着，但不会发给模型。
