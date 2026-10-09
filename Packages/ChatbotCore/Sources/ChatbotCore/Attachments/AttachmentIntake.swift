@@ -63,7 +63,7 @@ enum TextDecoder {
     private static func detectEncoding(_ data: Data) -> String? {
         #if canImport(Darwin)
         var converted: NSString?
-        var usedLossyConversion = false
+        var usedLossyConversion: ObjCBool = false
         let encoding = NSString.stringEncoding(
             for: data,
             encodingOptions: [.allowLossyKey: false],
