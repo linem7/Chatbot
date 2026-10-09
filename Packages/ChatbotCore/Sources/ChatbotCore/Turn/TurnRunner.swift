@@ -113,7 +113,7 @@ public struct TurnRunner: Sendable {
 
             var continuations = 0
             while true {
-                var messages = input.history + [input.userMessage]
+                var messages = input.history.droppingUnansweredTurns() + [input.userMessage]
                 // 续接时把当前内容原样发回去
                 if !answer.content.isEmpty { messages.append(answer) }
                 let request = ModelRequest(

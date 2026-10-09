@@ -1,48 +1,52 @@
 import AppKit
 import SwiftUI
 
-enum MenuBarIconState {
+enum MenuBarIconState: Equatable {
     case idle
-    case generating
+    /// 生成中。MenuBarExtra 的 label 会被渲染成静态图片，`.symbolEffect` 不会播放，
+    /// 所以由 store 的计时器推进 `frame`，在两张图之间切换。
+    case generating(frame: Int)
     /// 生成完了但用户还没看，下次打开面板后消失。
     case unread
 }
 
-private let symbolName = "bubble.left.and.text.bubble.right"
-
-/// 菜单栏图标的三种状态（SPEC §2.3）。
+/// 菜单栏图标的三种状态（SPEC §2.3）。三种状态都用同样方式绘制的 template 图片，大小一致，颜色跟随菜单栏。
 struct MenuBarIcon: View {
     let state: MenuBarIconState
 
     var body: some View {
         switch state {
         case .idle:
-            Image(systemName: symbolName)
-        case .generating:
-            Image(systemName: symbolName)
-                .symbolEffect(.pulse)
+            Image(nsImage: Self.idleImage)
+        case .generating(let frame):
+            Image(nsImage: frame.isMultiple(of: 2) ? Self.idleImage : Self.dimmedImage)
         case .unread:
             Image(nsImage: Self.unreadImage)
         }
     }
 
-    /// 图标右上角加一个小圆点。用 template 图片，颜色跟随菜单栏。
-    @MainActor
-    private static let unreadImage: NSImage = {
+    @MainActor private static let idleImage = makeImage(alpha: 1, dot: false)
+    @MainActor private static let dimmedImage = makeImage(alpha: 0.35, dot: false)
+    @MainActor private static let unreadImage = makeImage(alpha: 1, dot: true)
+
+    private static func makeImage(alpha: CGFloat, dot: Bool) -> NSImage {
         let size = symbolImage()?.size ?? NSSize(width: 20, height: 16)
         let image = NSImage(size: size, flipped: false) { rect in
-            symbolImage()?.draw(in: rect)
-            let diameter: CGFloat = 6
-            NSColor.black.setFill()
-            NSBezierPath(ovalIn: NSRect(x: rect.maxX - diameter, y: rect.maxY - diameter, width: diameter, height: diameter)).fill()
+            symbolImage()?.draw(in: rect, from: .zero, operation: .sourceOver, fraction: alpha)
+            if dot {
+                // 图标右上角的小圆点
+                let diameter: CGFloat = 6
+                NSColor.black.setFill()
+                NSBezierPath(ovalIn: NSRect(x: rect.maxX - diameter, y: rect.maxY - diameter, width: diameter, height: diameter)).fill()
+            }
             return true
         }
         image.isTemplate = true
         return image
-    }()
+    }
 }
 
 private func symbolImage() -> NSImage? {
-    NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)?
+    NSImage(systemSymbolName: "bubble.left.and.text.bubble.right", accessibilityDescription: nil)?
         .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 15, weight: .regular))
 }
