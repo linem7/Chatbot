@@ -109,6 +109,14 @@ final class ChatStore {
         isPanelVisible = false
     }
 
+    /// Quick Panel 是否被固定住。固定时失焦、Esc、Hotkey 都不再收起面板，只有再点一次图钉才取消（SPEC §2.3，#59）。
+    /// 只在本次运行内有效，不写进设置，重启 App 回到默认。
+    var isPanelPinned = false
+
+    func togglePanelPinned() {
+        isPanelPinned.toggle()
+    }
+
     nonisolated static func shouldStartNewConversation(lastTurnEndedAt: Date?, isGenerating: Bool, now: Date) -> Bool {
         // 后台还有回答在生成时，一律接着那个 Conversation
         if isGenerating { return false }

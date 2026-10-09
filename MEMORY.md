@@ -47,11 +47,17 @@
     - 错误按钮表里 `authentication` 也给「重试」：SPEC §7。
 - v1 有意不建 App 的测试 target：ChatStore 等 App 侧逻辑目前靠 #39 的真机清单验证，v1 之后再考虑补测试。
 
+## 进度（追加）
+
+- 2026-10-09：百炼的联网能力判断修掉了。之前假设「百炼平台上所有 Model 都能联网」，实际文档的清单按模型名给、而且分地域（北京 / 新加坡 / 全球三张表，全球地域上一个 DeepSeek 都没有）。新增 `BailianModelTable` 查表，`Platform.bailian` 带上地域。**这条推翻了 ADR-0003 原来的说法**，ADR-0003 / SPEC / ARCHITECTURE / research 都已同步。用户要求直接收尾，**没有走 PR**，直接推到了 main（commit 4f45099）。
+- 2026-10-09：新需求「Quick Panel 可以固定，一直在最前」→ issue #59。决策（用户已确认）：固定后 Esc、Hotkey、失焦都**不再**收起面板，只能点图钉取消固定；**不**跨重启记住；开关是 Quick Panel 顶栏的图钉按钮。`hide()` 是唯一的收口，守卫放在那一处。
+
 ## 偏好补充
 
 - 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。可以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ），也可以在征得用户同意后用 GitHub Pages。修改仓库可见性前要先问用户。
-- **当前这台机器是 Linux**，没法构建和运行 Swift/macOS app。用户在 Mac 上开发，CI 用 macOS runner。在这里只能写代码、写文档，要说明代码没有经过编译验证。
-  - 2026-10-09 起这台机器装了 Swift 6.3.3（swiftly，在 `~/.local/share/swiftly`，没改 shell 配置），可以在 Linux 上跑 ChatbotCore 的 `swift test`。用之前先 `source ~/.local/share/swiftly/env.sh`。系统没有 SQLite 头文件，GRDB 要用解到用户目录的 libsqlite3-dev，在仓库根目录执行：
-    `swift test --package-path Packages/ChatbotCore -Xcc -I$HOME/.local/share/sqlite3-dev/root/usr/include -Xlinker -L$HOME/.local/share/sqlite3-dev/root/usr/lib/x86_64-linux-gnu`
-  - Linux 上没有 `URLSession.bytes(for:)`，`URLSessionTransport` 只在 Darwin 上编译，真实网络调用和 App target 仍然只能靠 CI 或用户在 Mac 上验证。
-  - 这台机器内存紧张：等 CI 时在前台查结果，不要开后台常驻的监视进程。
+- **当前这台机器就是用户的 Mac**（2026-10-09 起；`Chaopais-Mac-mini.local`，arm64，macOS 27.0，Apple Swift 6.4）。Xcode 27.0 装在 `/Applications/Xcode-27.0.0.app`（**版本号带后缀**，不是 `/Applications/Xcode.app`），`xcode-select` 已指过去。可以直接构建和跑测试，改动能本地验证，不用只靠 CI：
+  - `xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Debug -derivedDataPath build build`
+  - `swift test --package-path Packages/ChatbotCore`
+  - 装 app 用 `./scripts/install.sh`。
+- **网络**：GitHub、Apple 的 CDN 直连不通（curl 15 秒超时、0 字节），命令行工具（git、gh、xcodebuild 拉包）要挂代理，例如 `export https_proxy=http://127.0.0.1:8118 http_proxy=http://127.0.0.1:8118`，详见记忆 `github-needs-local-proxy`。**不要**改全局 git 代理配置（用户没同意过）。
+- 更早的会话在另一台 Linux 机器上跑（swiftly 装 Swift 6.3.3、GRDB 要解 libsqlite3-dev、没有 `URLSession.bytes(for:)`）。那些说明在 Mac 上都不适用：这台没有 `~/.local/share/swiftly`。

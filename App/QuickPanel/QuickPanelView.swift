@@ -65,6 +65,17 @@ private struct QuickPanelHeader: View {
                 .frame(width: 190, alignment: .leading)
             Spacer(minLength: 0)
             Button {
+                store.togglePanelPinned()
+            } label: {
+                Image(systemName: store.isPanelPinned ? "pin.fill" : "pin")
+                    .foregroundStyle(store.isPanelPinned ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.borderless)
+            .help(store.isPanelPinned
+                ? "Unpin: hide the panel when it loses focus"
+                : "Pin: keep the panel in front of other windows")
+            Button {
                 store.newConversation()
             } label: {
                 Image(systemName: "square.and.pencil")

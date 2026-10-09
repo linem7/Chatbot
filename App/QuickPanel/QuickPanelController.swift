@@ -66,8 +66,11 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     }
 
     /// 再按一次 Hotkey、按 Esc、失焦时调用。只隐藏，不停止生成。
+    ///
+    /// 固定住时什么都不做（SPEC §2.3，#59）。三种收起方式都走这里，所以守卫放在这一处就够，
+    /// 调用点不用各自判断。
     func hide() {
-        guard isShown else { return }
+        guard isShown, !store.isPanelPinned else { return }
         isShown = false
         removeKeyMonitor()
         panel.orderOut(nil)
@@ -88,6 +91,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
 
     func windowDidResignKey(_ notification: Notification) {
         guard !isPresentingFilePicker else { return }
+        // 固定住时 hide() 会挡掉，面板留在原地（SPEC §2.3）
         hide()
     }
 
