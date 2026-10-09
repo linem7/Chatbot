@@ -55,8 +55,9 @@
 - 2026-10-09：#63（面板可拖动）和 #64（Hotkey 支持连按两次 ⌘）实现完，在 PR #65 里。决策（用户已确认）：只有顶栏空当能拖、位置不持久化（重启回到偏上居中）；⌘ 双击接受辅助功能权限、没授权之前组合键继续可用。两项都已编译、装到 /Applications，真机验证通过。
 - 2026-10-09：真机发现 PR #65 的拖动区把顶栏撑高了（NSView 没有固有高度，塞进 HStack 会被竖直拉伸）。修法（PR #66，合并人 linem7）：中间换回 `Spacer(minLength: 0)`，`HeaderDragArea` 挪进整条顶栏的 `.background`。用户 2026-10-10 确认顶栏高度恢复。
 - 2026-10-10：**#62、#63、#64 收尾关闭**——每个 issue 下写了结论评论、按 completed 关闭、并在 #1 的「Decisions so far」追加了一行。同一时间远端没有别的待合 PR。本地 `main` 已同步到 `4dc099c`；`/Applications` 里装的就是这个提交的内容（和 `462c0d8` 无 diff）。
-- 2026-10-10：本地五个已并入 main 的旧分支（`quick-panel-header-height`、`quick-panel-drag-hotkey`、`quick-panel-pin`、`fix/bailian-deepseek-v41-web-search`、`fix/bailian-web-search-model-table`）已删除。
-- 2026-10-10 待确认：#59 关闭时**没有**在 #1 追加行（v1.1 阶段的结论记在 #45 地图里），而 CLAUDE.md 写的是追加到 #1——这条规矩后来走样了，以哪张地图为准要和用户确认。
+- 2026-10-10：清理分支——本地五个已并入 main 的旧分支（`quick-panel-header-height`、`quick-panel-drag-hotkey`、`quick-panel-pin`、`fix/bailian-deepseek-v41-web-search`、`fix/bailian-web-search-model-table`）和远端两个（`quick-panel-drag-hotkey`、`quick-panel-pin`，均已合入 main）都已删除。远端现在只剩 `main` 和 `gh-pages`（原型页，保留）。
+- 2026-10-10：**以 #1 为准**（用户确认）。#59 关闭时漏掉的那一行已补进 #1 的「Decisions so far」，按关闭顺序排在 #62/#63/#64 前面。
+- 2026-10-10 遗留：v1.1 那批（#46–#54）的结论只记在 #45 地图的「Decisions so far」里，没进 #1——按「以 #1 为准」的规矩是个缺口，要不要搬过来还没问用户。
 
 ## 偏好补充
 
