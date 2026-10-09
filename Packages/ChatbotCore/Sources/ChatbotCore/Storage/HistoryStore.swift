@@ -7,7 +7,7 @@ import GRDB
 /// App 里 directory 是 `~/Library/Application Support/com.linem7.Chatbot/`。
 public final class HistoryStore: MessageStore, TitleStore, Sendable {
     /// 最后一条消息在这么久之前的 Conversation 会被静默删除（SPEC §8）。
-    public static let retention: TimeInterval = 30 * 86_400
+    static let retention: TimeInterval = 30 * 86_400
 
     private let database: DatabasePool
     private let attachmentsDirectory: URL
@@ -230,15 +230,6 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
         }
         removeAttachments(of: ids)
         return ids.count
-    }
-
-    /// 启动时清理一次，之后每 24 小时一次（SPEC §8）。一直运行到所在的 Task 被取消。
-    public func runPeriodicCleanup(interval: Duration = .seconds(86_400)) async {
-        while !Task.isCancelled {
-            // 清理失败不提示，下次再试
-            _ = try? await deleteExpiredConversations()
-            try? await Task.sleep(for: interval)
-        }
     }
 
     private func removeAttachments(of conversationIDs: [UUID]) {

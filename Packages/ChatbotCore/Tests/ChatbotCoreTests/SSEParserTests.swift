@@ -15,7 +15,7 @@ struct SSEParserTests {
 
     private func parse(byteChunks: [[UInt8]]) -> [SSEEvent] {
         var parser = SSEParser()
-        return byteChunks.flatMap { parser.push($0) } + parser.finish()
+        return byteChunks.flatMap { parser.push($0) }
     }
 
     // MARK: WHATWG 示例

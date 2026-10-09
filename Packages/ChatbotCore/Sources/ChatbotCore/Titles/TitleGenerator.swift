@@ -9,7 +9,7 @@ public protocol TitleStore: Sendable {
 /// 失败时不提示，保留原来的标题（第一条用户消息的前一行）。
 public struct TitleGenerator: Sendable {
     /// 标题最多这么多个字符。
-    public static let maxLength = 30
+    static let maxLength = 30
 
     static let systemPrompt = """
         根据下面这段对话，起一个简短的标题：不超过 15 个字（英文不超过 8 个词），\

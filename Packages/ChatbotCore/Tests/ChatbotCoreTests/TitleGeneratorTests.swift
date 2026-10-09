@@ -59,7 +59,7 @@ struct TitleGeneratorTests {
 
     @Test func veryLongTitlesAreCut() async throws {
         let adapter = ScriptedAdapter([[.event(.textDelta(String(repeating: "长", count: 100))), .event(.finished(.stop))]])
-        #expect(try await generate(adapter)?.title.count == TitleGenerator.maxLength)
+        #expect(try await generate(adapter)?.title.count == 30)
     }
 }
 
