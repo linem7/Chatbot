@@ -138,8 +138,15 @@ message(id, conversationID → conversation ON DELETE CASCADE, seq, role, status
         plainText,          -- 用于全文搜索：用户文字或回答正文
         createdAt)
 attachment(id, messageID → message ON DELETE CASCADE, kind(image|pdf|text), originalName, storedFile, extractedTextFile?)
-message_fts(FTS5，索引 conversation.title 和 message.plainText)
+conversation_fts(FTS5，trigram 分词，和 conversation.title 同步)
+message_fts(FTS5，trigram 分词，和 message.plainText 同步)
 ```
+
+- **时间**：所有时间列存 `timeIntervalSinceReferenceDate`，也就是自 2001-01-01 起的秒数（Double）。这是 `Date` 内部的表示，读写完全一致；换算成 Unix 秒会有舍入误差。
+- **全文搜索**：标题和正文各用一张 FTS5 表，由 GRDB 建的触发器自动同步。用 trigram 分词，因为中文没有空格，默认的 unicode61 分词会把一整段中文当成一个词。trigram 的 MATCH 对少于 3 个字符的查询匹配不到任何结果，所以：
+  - 3 个字符及以上用 MATCH，走索引；
+  - 更短的查询（比如两个字的中文词）退回 `LIKE '%…%'`，是全表扫描。
+- **写入**：由 `HistoryStore` 实现 `MessageStore`（§4）。用户 Message 第一次保存时，一起创建 conversation 行，标题先用第一条用户消息的前一行。所以 `saveUserMessage` 接收整个 Conversation。后台生成的标题通过 `TitleStore` 写入。
 
 `ContentBlock` 的种类：`text(String, citations)`、`attachmentRef(id)`、`toolCall`、`toolResult`、`webSearch(query)`、`opaque(provider, JSONValue)`。每个块都可以带 `providerData`。
 

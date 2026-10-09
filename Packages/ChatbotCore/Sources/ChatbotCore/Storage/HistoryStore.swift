@@ -5,7 +5,7 @@ import GRDB
 ///
 /// 目录结构：`<directory>/history.sqlite` 和 `<directory>/attachments/<conversationID>/`。
 /// App 里 directory 是 `~/Library/Application Support/com.linem7.Chatbot/`。
-public final class HistoryStore: MessageStore, Sendable {
+public final class HistoryStore: MessageStore, TitleStore, Sendable {
     /// 最后一条消息在这么久之前的 Conversation 会被静默删除（SPEC §8）。
     public static let retention: TimeInterval = 30 * 86_400
 

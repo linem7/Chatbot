@@ -62,13 +62,17 @@ public struct TurnRunner: Sendable {
 
     private let store: any MessageStore
     private let makeAdapter: @Sendable (Connection) -> any ProviderAdapter
+    private let titleGenerator: TitleGenerator?
 
+    /// - Parameter titleGenerator: 第一次 Turn 结束后用它在后台生成标题；nil 时不生成。
     public init(
         store: any MessageStore,
-        makeAdapter: @escaping @Sendable (Connection) -> any ProviderAdapter = { $0.provider.makeAdapter() }
+        makeAdapter: @escaping @Sendable (Connection) -> any ProviderAdapter = { $0.provider.makeAdapter() },
+        titleGenerator: TitleGenerator? = nil
     ) {
         self.store = store
         self.makeAdapter = makeAdapter
+        self.titleGenerator = titleGenerator
     }
 
     public func run(_ input: TurnInput) -> TurnHandle {
@@ -140,6 +144,20 @@ public struct TurnRunner: Sendable {
         let finalAnswer = answer
         try? await Self.ignoringCancellation {
             try await store.saveAssistantMessage(finalAnswer, conversationID: input.conversation.id)
+        }
+
+        // §4 第 5 步：第一次 Turn 有了回答，就在后台生成标题，不等它完成
+        if let titleGenerator, input.history.isEmpty, !answer.markdownText.isEmpty,
+           answer.status == .complete || answer.status == .interrupted {
+            Task {
+                await titleGenerator.generateTitle(
+                    for: input.conversation,
+                    connection: input.connection,
+                    apiKey: input.apiKey,
+                    question: input.userMessage,
+                    answer: finalAnswer
+                )
+            }
         }
         return answer
     }

@@ -12,7 +12,7 @@ public protocol MessageStore: Sendable {
 }
 
 /// 只存在内存里的 MessageStore。
-public actor InMemoryMessageStore: MessageStore {
+public actor InMemoryMessageStore: MessageStore, TitleStore {
     private var conversationsByID: [UUID: Conversation] = [:]
     private var messagesByConversation: [UUID: [Message]] = [:]
 
@@ -25,6 +25,11 @@ public actor InMemoryMessageStore: MessageStore {
 
     public func saveAssistantMessage(_ message: Message, conversationID: UUID) {
         upsert(message, conversationID: conversationID)
+    }
+
+    public func saveGeneratedTitle(_ title: String, conversationID: UUID) {
+        conversationsByID[conversationID]?.title = title
+        conversationsByID[conversationID]?.titleIsGenerated = true
     }
 
     public func conversation(_ id: UUID) -> Conversation? {
