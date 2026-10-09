@@ -115,14 +115,15 @@ struct PlatformWebSearchTests {
     }
 
     /// 百炼的清单按模型名和地域给（`BailianModelTable`，依据 research §2.2），不是「平台上的模型都能搜」。
-    @Test func bailianOnlyGivesServerSearchToTheModelsTheDocLists() {
+    /// 清单不等于「联网搜索页原文」：模型页说支持的也算（#62）。
+    @Test func bailianOnlyGivesServerSearchToTheModelsOnItsList() {
         let beijing = connection("https://dashscope.aliyuncs.com/compatible-mode/v1")
         #expect(beijing.capabilities(ofModel: "deepseek-v4-flash").webSearch)
         #expect(beijing.capabilities(ofModel: "deepseek-v3.2").webSearch)
         #expect(beijing.capabilities(ofModel: "qwen3.8-max").webSearch)
         #expect(beijing.capabilities(ofModel: "qwen-plus").webSearch)
-        // 用户实测的那一条：模型页写着支持，联网清单里没有它（§2.2 的「一个出入」），按钮要置灰
-        #expect(!beijing.capabilities(ofModel: "deepseek-v4.1-flash").webSearch)
+        // v4.1-flash：模型页写着支持、联网清单里没有它，按模型页算支持（#62，用户在用它）
+        #expect(beijing.capabilities(ofModel: "deepseek-v4.1-flash").webSearch)
         // 表外的模型一律不支持
         #expect(!beijing.capabilities(ofModel: "deepseek-v4.2-preview").webSearch)
         // 要 search_strategy: agent 的 Omni 系列，只发 enable_search 搜不到

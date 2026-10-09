@@ -11,6 +11,10 @@
 /// - 需要 `search_strategy: agent` 的（千问 Omni、Omni-Realtime 系列）不收。客户端只发 `enable_search`，
 ///   策略走默认值，文档说这些模型必须设 agent 才会检索——收了按钮会亮，但搜不到；
 /// - 只能走 Responses API 的（glm-5.2、kimi-k3）不收。这里走的是 Chat Completions。
+///
+/// 「联网搜索」页的清单会滞后：**模型页说支持的模型不一定出现在清单里**（`deepseek-v4.1-flash` 就是，
+/// #62）。遇到这种矛盾以模型页为准把它补进来，不要默认它不支持。反过来说，清单里没有的模型也应该
+/// 去模型页确认一遍再排除。
 enum BailianModelTable {
     /// 一个地域上能联网的模型。第三方模型数量少、快照是固定的，写全名；
     /// 千问的快照版本按日期不断新增，写前缀族。
@@ -48,6 +52,8 @@ enum BailianModelTable {
         names: [
             // deepseek-v4 系列同时支持 Responses API，这里走 Chat Completions
             "deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-v4-flash", "deepseek-v4-flash-0731",
+            // 不在「联网搜索」页的清单里，但 DeepSeek 模型页的「其它功能」写着支持，用户在用它（#62）
+            "deepseek-v4-1-flash",
             "deepseek-v3-2", "deepseek-v3-2-exp", "deepseek-v3-1",
             "deepseek-r1-0528", "deepseek-r1", "deepseek-v3",
             // Kimi 的 kimi-k3 只能走 Responses API
