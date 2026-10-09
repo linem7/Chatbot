@@ -35,8 +35,12 @@ _Avoid_: Provider 能力（能力属于 Model，不属于 Provider）
 _Avoid_: 快捷键（不加限定时容易和面板内的快捷键混淆）
 
 **Quick Panel**:
-按 Hotkey 唤起的浮动面板，不抢走前台 app 的激活状态，用来快速提问，问完就收起。
+按 Hotkey 唤起的浮动面板，不抢走前台 app 的激活状态，用来快速提问，问完就收起；也可以固定住，固定后一直保持在最前。
 _Avoid_: 浮窗、弹窗、Popup
+
+**Pinned**:
+Quick Panel 的固定状态，由顶栏的图钉按钮开关。固定时失焦、Esc、Hotkey 都不再收起面板，切到别的 app 也保持在最前。只在本次运行内有效，不写进设置。
+_Avoid_: 置顶、钉住、Always on top（说「固定」或 Pinned）
 
 **Main Window**:
 普通的 app 窗口，用来浏览历史 Conversation 和修改设置。

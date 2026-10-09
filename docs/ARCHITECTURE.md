@@ -211,7 +211,7 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
   - `styleMask` 设为 `.nonactivatingPanel` + `.borderless`，并重写 `canBecomeKey = true`；
   - `level = .floating`，`collectionBehavior` 包括 `.canJoinAllSpaces`、`.fullScreenAuxiliary`、`.transient`、`.ignoresCycle`；
   - 内容用 `NSHostingView`；
-  - 在 `windowDidResignKey` 中执行 `orderOut`；
+  - 在 `windowDidResignKey` 中执行 `orderOut`；面板被固定住时（顶栏图钉，#59）`hide()` 直接返回，失焦、Esc、Hotkey 都不再收起，窗口就留在 `.floating` 层级上——「保持在最前」靠的是已有的层级，固定状态只是不再自己 `orderOut`。守卫只放在 `hide()` 这一处，三种收起方式都从它经过；
   - 面板内的快捷键用本地 `NSEvent` monitor 按 keyCode 处理：Esc 隐藏面板，⌘. 停止生成，⌘N 新对话。不用 `.onExitCommand`，因为 AppKit 把 Esc 和 ⌘. 都映射为 `cancelOperation:`，没法区分；输入法正在组字时 Esc 交给输入法；
   - 按鼠标所在的屏幕定位。
 - **输入框**：用 `NSViewRepresentable` 包装 `NSTextView`，不用 SwiftUI 的 `TextEditor`。一是要在 `textView(_:doCommandBy:)` 里实现 ⏎ 发送、⇧⏎ 换行，输入法正在组字时 ⏎ 由输入法消费，不会误发送；二是面板显示时可以直接 `makeFirstResponder`，不依赖 `@FocusState`。面板不激活 app，⌘C、⌘V 等编辑命令由面板的 `performKeyEquivalent` 直接发给响应链。
