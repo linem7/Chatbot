@@ -54,6 +54,8 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
 
     func show() {
         guard !isShown else { return }
+        // app 被隐藏（hidden）时，不激活 app 的面板也显示不出来；只取消隐藏，不激活
+        if NSApp.isHidden { NSApp.unhideWithoutActivation() }
         isShown = true
         store.panelWillShow()
         positionOnMouseScreen()
@@ -81,8 +83,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         guard NSApp.isActive else { return }
         let hasOtherVisibleWindow = NSApp.windows.contains { $0 !== panel && $0.isVisible && $0.canBecomeMain }
         guard !hasOtherVisibleWindow, !app.isTerminated else { return }
-        NSApp.yieldActivation(to: app)
-        _ = app.activate(from: .current, options: [])
+        app.receiveActivation()
     }
 
     func windowDidResignKey(_ notification: Notification) {

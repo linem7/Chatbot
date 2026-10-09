@@ -58,5 +58,5 @@ codesign --verify --deep --strict /Applications/Chatbot.app \
     || fail "签名校验失败：在 Keychain Access 里确认证书 Chatbot Self-Signed 的 Code Signing 设成了 Always Trust。"
 
 step "启动"
-open /Applications/Chatbot.app || fail "启动失败：试试在访达里打开 /Applications/Chatbot.app。"
+open /Applications/Chatbot.app || fail "启动失败：试试在 Finder 里打开 /Applications/Chatbot.app。"
 echo "✓ 已安装。Chatbot 在菜单栏里，按 option+space 唤起。"

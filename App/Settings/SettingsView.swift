@@ -22,6 +22,7 @@ struct SettingsView: View {
             }
         }
         .frame(width: 680, height: 500)
+        .regularWindow(.settings)
     }
 }
 
