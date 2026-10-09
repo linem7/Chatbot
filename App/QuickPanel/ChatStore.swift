@@ -227,6 +227,16 @@ final class ChatStore {
         historyRevision += 1
     }
 
+    /// 地球按钮：只对当前 Conversation 开关 Web Search，默认开启（SPEC §5）。
+    /// 持久化：已经落库的 Conversation 立刻更新；还没落库的，第一次保存用户 Message 时会把这个字段一起写进去。
+    func setWebSearchEnabled(_ enabled: Bool) {
+        guard var conversation, conversation.webSearchEnabled != enabled else { return }
+        conversation.webSearchEnabled = enabled
+        self.conversation = conversation
+        let id = conversation.id
+        Task { try? await history.saveWebSearchEnabled(enabled, conversationID: id) }
+    }
+
     /// 设置里保存了 Connection 之后调用：之前没有可用的 Model 时，现在补一个 Conversation。
     func connectionsDidChange() {
         if conversation == nil { conversation = makeConversation() }

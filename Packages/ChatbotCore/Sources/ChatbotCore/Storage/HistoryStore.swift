@@ -176,6 +176,17 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
 
     // MARK: 修改
 
+    /// 地球按钮：这个 Conversation 开不开 Web Search。还没落库的 Conversation 不做任何事——
+    /// 第一次保存用户 Message 时会把这个字段一起写进去。
+    public func saveWebSearchEnabled(_ enabled: Bool, conversationID: UUID) async throws {
+        try await database.write { db in
+            try db.execute(
+                sql: "UPDATE conversation SET webSearchEnabled = ? WHERE id = ?",
+                arguments: [enabled, conversationID.uuidString]
+            )
+        }
+    }
+
     /// 后台生成的标题。
     public func saveGeneratedTitle(_ title: String, conversationID: UUID) async throws {
         try await database.write { db in

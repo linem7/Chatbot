@@ -98,6 +98,23 @@ struct HistoryStoreTests {
         #expect(renamed.titleIsGenerated == true)
     }
 
+    @Test func webSearchSwitchIsRememberedPerConversation() async throws {
+        let store = try openStore()
+        let conversation = conversation()
+        try await store.saveUserMessage(.user("q"), in: conversation)
+        #expect(try await store.conversation(conversation.id)?.webSearchEnabled == true)
+
+        try await store.saveWebSearchEnabled(false, conversationID: conversation.id)
+        #expect(try await openStore().conversation(conversation.id)?.webSearchEnabled == false)
+    }
+
+    @Test func webSearchSwitchForAnUnsavedConversationIsANoOp() async throws {
+        // 还没发过消息的 Conversation 不在数据库里；第一次保存用户 Message 时会带上这个字段
+        let store = try openStore()
+        try await store.saveWebSearchEnabled(false, conversationID: UUID())
+        #expect(try await store.conversations().isEmpty)
+    }
+
     @Test func savingTheSameMessageAgainReplacesIt() async throws {
         let store = try openStore()
         let conversation = conversation()

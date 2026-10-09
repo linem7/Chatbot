@@ -30,7 +30,8 @@ App/                         # app target「Chatbot」：界面和系统集成
   MainWindow/                # 历史列表、搜索、Conversation 详情
   Settings/                  # 通用 / Connection / 高级三个标签页
   System/                    # Hotkey、Keychain、开机启动、剪贴板和拖拽的接入
-  Rendering/                 # MarkdownUI 主题、代码高亮、Citation 角标、Gemini 搜索建议的 WebView
+  Rendering/                 # MarkdownUI 主题、代码高亮；MessageRow（Quick Panel 和 Main Window 共用的消息显示：
+                             #   搜索状态、Citation 角标、来源列表）；Gemini 搜索建议的 WebView
   Resources/                 # Localizable.xcstrings：界面文案的 String Catalog，源语言英文，另有 zh-Hans
 Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测试。以下目录都在 Sources/ChatbotCore/ 下，测试在 Tests/ChatbotCoreTests/
   Domain/                    # Connection、Model、ModelCapabilities、Conversation、Message、ContentBlock、ChatError
@@ -39,6 +40,7 @@ Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测�
   Storage/                   # GRDB 数据库、迁移、全文搜索、30 天清理、附件文件
   Attachments/               # 图片缩放和编码、PDF 抽取文本、文本文件解码
   Titles/                    # 后台生成标题
+  Presentation/              # AnswerPresentation：回答怎么显示（插角标、来源列表、搜索状态、搜索建议），纯字符串处理，可测试
 ```
 
 依赖方向：`App → ChatbotCore`。`ChatbotCore` 不引用 SwiftUI 和 AppKit；PDFKit、ImageIO 不属于 UI 框架，可以在包里用。
