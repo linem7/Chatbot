@@ -185,12 +185,13 @@
 - 自动打开设置窗口的 Connection 页，并预选 DeepSeek 模板。
 - 检测 Hotkey 冲突并给出提示。
 - 如果还没有任何 Connection 就按了 Hotkey，面板里只显示一个「添加 Connection」按钮。
-- v1 不需要任何系统权限：没有屏幕录制，也没有辅助功能。
+- v1 不需要屏幕录制权限（没有截图）。Hotkey 默认的组合键模式也不需要任何权限；只有把 Hotkey 改成「连按两次 ⌘」时才需要辅助功能权限（见 §2.1）。
 
 ## 11. 分发与更新
 
-- **v1 只自用**：在本机用 Xcode 构建、打包，再安装。用自签名证书签名，不做公证（ADR-0005）。
-- **不做更新检查，也不在 GitHub Release 上发布**。以后要分发给别人时，再加上 tag 自动发布和「有新版本」提示（仓库已经是公开的）。届时用户第一次打开时，需要到「系统设置 → 隐私与安全性」里点「仍要打开」。
+- **v1.0.0 通过 GitHub Release 分发**：在本机用 Xcode 构建 Apple Silicon Release，使用固定自签名证书签名，不做公证（ADR-0005），手动上传应用 ZIP。最低 macOS 26。
+- 首次打开如被拦截，用户进入 **System Settings › Privacy & Security › Open Anyway**。安装和升级步骤见 [安装指引](INSTALL.md)。
+- 不做更新检查、自动更新或 tag 自动发布；用户下载新版本手动替换应用。
 
 ## 12. v1 明确不做
 
@@ -203,6 +204,6 @@
 - 导出 Conversation
 - 手动覆盖 Model Capabilities
 - LaTeX 公式渲染
-- 对外分发：GitHub Release 发布、更新检查、自动更新
+- 更新检查、自动更新、tag 自动发布
 - Mac App Store 分发、App Sandbox
 - 跨平台和移动端、插件系统、团队协作、iCloud 同步

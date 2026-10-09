@@ -2,6 +2,14 @@
 
 一个 macOS 上的 AI 聊天助手，目标是**随手就能叫出来**：按一个快捷键唤起，问完就走，不打断手头的事。
 
+## 下载与安装
+
+**v1.0.0：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
+
+[下载 v1.0.0 安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.0/Chatbot-1.0.0-macOS-arm64.zip) · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Chatbot/releases)
+
+解压后把 `Chatbot.app` 拖进 **Applications**。首次打开如被拦截，进入 **System Settings › Privacy & Security › Open Anyway**。应用采用自签名、未经过 Apple 公证；使用时需要自己的 API key。无需安装 Xcode 或创建证书。
+
 ## 为什么做这个
 
 现在用 AI 的流程太碎了：切到浏览器 → 打开网页 → 粘贴内容 → 等回答 → 再切回来。屏幕上的东西（报错信息、图表、一段代码、一个弹窗）还得手动描述，或者截图再上传。
@@ -14,7 +22,8 @@
 
 ### 1. 快速调用
 - 按 **option+space**（可以改）从任何 app 里唤起 Quick Panel，它出现在当前屏幕的偏上居中位置。
-- 失焦、按 Esc 或再按一次快捷键就收起。回答在后台继续生成，菜单栏图标会提示状态。
+- 失焦、按 Esc 或再按一次快捷键就收起。点顶栏图钉可固定面板，固定期间不会自动收起；拖动顶栏空白处可移动。回答在后台继续生成，菜单栏图标会提示状态。
+- 可在 Settings 的 General 页改用连按两次 ⌘ 唤起，需要 Accessibility 权限。
 - 10 分钟内再次唤起会接着上一段对话，超过 10 分钟就自动新开。
 - 常驻菜单栏，平时不占 Dock，不抢焦点，也不弹通知。
 
@@ -43,7 +52,7 @@
 - 不开模型「思考」，也不展示推理过程：这是一个快速解决问题的工具
 - 不做对话导出、团队协作、分享、iCloud 同步
 - 不做插件系统或自定义工作流
-- 不做移动端，不跨平台，不上 Mac App Store；v1 也不对外发布，不做更新检查
+- 不做移动端，不跨平台，不上 Mac App Store；不做更新检查或自动更新
 
 ## 技术栈
 
@@ -58,9 +67,9 @@
 
 日常主要用 **DeepSeek**（OpenAI 兼容协议），同时支持 Anthropic 和 Gemini。所有请求都关闭思考模式，优先保证回答速度。是否支持图片、是否能联网，以各家模型列表接口返回的能力为准。
 
-## 安装
+## 从源码构建和安装
 
-v1 只自用，不对外发布：在本机构建后安装。app 用一张固定的自签名证书签名，没有经过 Apple 公证（[ADR-0005](docs/adr/0005-self-signed-certificate-no-notarization.md)）。首次启动会打开 Settings 窗口，选择 DeepSeek 模板，粘贴 API key 即可开始使用。
+普通用户请按[安装指引](docs/INSTALL.md)下载 Release 安装包。以下步骤供需要自行编译的开发者使用。app 用固定的自签名证书签名，没有经过 Apple 公证（[ADR-0005](docs/adr/0005-self-signed-certificate-no-notarization.md)）。
 
 ### 准备
 
@@ -116,7 +125,7 @@ API key 存在 Keychain 里，Keychain 按签名身份判断访问权限。所�
 - 会打开 **Launch at Login**。macOS 会弹一条 **Background Items Added** 的系统通知，这是系统行为，不是 app 发的。
 - 如果 option+space 已经被系统快捷键占用，会弹窗提示。
 
-本机构建的 app 没有隔离标记（quarantine），不会被 Gatekeeper 拦下。以后对外分发时，下载的人第一次打开需要到 **System Settings › Privacy & Security** 里点 **Open Anyway**（ADR-0005）。
+本机构建的 app 没有隔离标记（quarantine），不会被 Gatekeeper 拦下。从 GitHub Release 下载的 app 首次打开如被拦截，需要到 **System Settings › Privacy & Security** 里点 **Open Anyway**（ADR-0005）。
 
 手动构建的步骤（和脚本做的事一样）：
 
@@ -130,7 +139,7 @@ ditto build/Build/Products/Release/Chatbot.app /Applications/Chatbot.app
 
 也可以 `open Chatbot.xcodeproj` 后在 Xcode 里构建运行。改了 `project.yml` 或增删了源文件后，要重新执行 `xcodegen generate`。
 
-### 升级
+### 源码安装的升级
 
 拉取最新代码后，再运行一次 `./scripts/install.sh`。证书没变，所以 Keychain 不会再要求授权。如果还是弹了，选 **Always Allow**，之后就不会再弹。设置、历史和 key 都会保留。
 
@@ -165,9 +174,19 @@ swift test --package-path Packages/ChatbotCore
 
 CI（`.github/workflows/ci.yml`）在 push 到 main 和 PR 时执行同样的生成、构建和测试，但不签名。
 
+### 制作 Release 安装包
+
+在配置好上述构建环境和固定签名证书的 Mac 上执行：
+
+```sh
+./scripts/package-release.sh
+```
+
+脚本只构建 Apple Silicon Release 并打包到 `build/releases/`，不会安装或启动应用，也不运行测试。上传生成的 ZIP 和 SHA-256 校验文件到对应版本的 GitHub Release。
+
 ## 项目状态
 
-v1 的功能都已经实现（规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)），正在 Mac 上逐项验证，见 #39。
+v1.0.0 通过 GitHub Release 分发，包含已有功能及真机反馈修复。规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。本次发布按维护者决定不追加发布前测试或试装。
 
 ## Roadmap
 
@@ -179,4 +198,5 @@ v1 的功能都已经实现（规格见 [docs/SPEC.md](docs/SPEC.md)，实现见
 - [x] 设置与首次启动引导
 - [x] Anthropic、Gemini 接入与联网搜索
 - [x] 错误展示与本机安装脚本
-- [ ] v1.0 完成（自用）：在 Mac 上通过 #39 的验证清单
+- [x] v1 功能及真机反馈修复
+- [x] v1.0.0：GitHub Release 安装包和安装指引

@@ -24,7 +24,7 @@
 - #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。B 方案的原型发布在 GitHub Pages：https://linem7.github.io/Chatbot/ （源是孤儿分支 `gh-pages`，只有 `index.html` 和 `.nojekyll`）。`prototype/quick-panel` 分支已删除；含三个变体的完整版只剩 Claude Artifact 那份。
 - #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
-- v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
+- 2026-10-10 用户决定发布 **v1.0.0** 给朋友安装，推翻此前“v1 只自用、不发 Release”的决定。采用本机固定自签名构建、Apple Silicon ZIP、手动上传 GitHub Release；最低 macOS 26，不做公证或自动更新。用户明确跳过本次发布前测试和试装。
 - 2026-10-09 应用户要求，仓库最终改为 **public**（来回改过几次），这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。GitHub Pages 已从 `gh-pages` 分支重新开启。
 - **2026-10-09 v1 实现完成**：实现 ticket #17–#25 全部关闭，PR 是 #26–#38、#40、#41（#39 是真机验证清单 issue）。用户在 Mac 上完成了真机验证，#39 已关闭。
 - **2026-10-09 真机反馈处理完成**：地图 #45「v1.1：真机反馈」已关闭（调研 PR #52，实现 PR #55–#58），用户复测通过。用户在这一轮定的，都已写进文档：
@@ -32,7 +32,7 @@
   - 经中转的 Claude / Gemini 用 Custom 模板选原生格式，接口没报告能力时按模型名查内置表兜底：ARCHITECTURE §3.2；
   - 设置窗口和 Main Window 不随失焦隐藏，开着时临时出现在 Dock 和 ⌘Tab：SPEC §1。
   - 「旧 Connection 消失」是误会：用户没注意到 Connection 页的「+」按钮（#50 以 not planned 关闭）。
-- 下一项工作是用户新开的 #59（Quick Panel 可以固定、一直在最前）。
+- #59–#67 都已关闭，见「进度（追加）」。**当前没有打开的 issue**。
 - 实现阶段新定的几条，都已经写进文档，以文档为准：
   - 用户本人定的：
     - 其他 app 的 Hotkey 冲突检测不到，只给静态提示：SPEC §2.1；
@@ -51,10 +51,15 @@
 
 - 2026-10-09：百炼的联网能力判断修掉了。之前假设「百炼平台上所有 Model 都能联网」，实际文档的清单按模型名给、而且分地域（北京 / 新加坡 / 全球三张表，全球地域上一个 DeepSeek 都没有）。新增 `BailianModelTable` 查表，`Platform.bailian` 带上地域。**这条推翻了 ADR-0003 原来的说法**，ADR-0003 / SPEC / ARCHITECTURE / research 都已同步。用户要求直接收尾，**没有走 PR**，直接推到了 main（commit 4f45099）。
 - 2026-10-09：#59（Quick Panel 可以固定，一直在最前）实现完并合进 main（PR #60）。决策（用户已确认）：固定后 Esc、Hotkey、失焦都**不再**收起面板，只能点图钉取消固定；**不**跨重启记住；开关是 Quick Panel 顶栏的图钉按钮。`hide()` 是唯一的收口，守卫放在那一处。
-- 2026-10-09：#63（面板可拖动）和 #64（Hotkey 支持连按两次 ⌘）实现完，在 PR #65 里。决策（用户已确认）：只有顶栏空当能拖、位置不持久化（重启回到偏上居中）；⌘ 双击接受辅助功能权限、没授权之前组合键继续可用。两项都**编译过并装到 /Applications，但真机手感还没验证**。
-- 2026-10-09：PR #65 已合。合入后顶栏被拖动区（NSViewRepresentable，没有固有高度）撑高，PR #66 把拖动区挪到顶栏 `.background` 修好，用户真机测过、已合。
-- 2026-10-09：开了 #67（待做）：打开设置窗口后 app 没有真正激活，窗口按非激活样式绘制，Models 的开关开和关都是灰色；⌘Tab 后恢复正常（用户已确认）。用户**明确要求保持 `Toggle` 样式，不换复选框**。
-- 2026-10-09：#68（Web Search 默认关闭）实现完，在 PR #69，**未编译验证**。决策（用户已确认）：每个新 Conversation 都从关开始、不记住上一次；Settings › General 加「新对话默认联网」开关（默认关）。
+- 2026-10-09：#63（面板可拖动）和 #64（Hotkey 支持连按两次 ⌘）实现完，在 PR #65 里。决策（用户已确认）：只有顶栏空当能拖、位置不持久化（重启回到偏上居中）；⌘ 双击接受辅助功能权限、没授权之前组合键继续可用。两项都已编译、装到 /Applications，真机验证通过。
+- 2026-10-09：真机发现 PR #65 的拖动区把顶栏撑高了（NSView 没有固有高度，塞进 HStack 会被竖直拉伸）。修法（PR #66，合并人 linem7）：中间换回 `Spacer(minLength: 0)`，`HeaderDragArea` 挪进整条顶栏的 `.background`。用户 2026-10-10 确认顶栏高度恢复。
+- 2026-10-10：**#62、#63、#64 收尾关闭**——每个 issue 下写了结论评论、按 completed 关闭、并在 #1 的「Decisions so far」追加了一行。同一时间远端没有别的待合 PR。本地 `main` 已同步到 `4dc099c`；`/Applications` 里装的就是这个提交的内容（和 `462c0d8` 无 diff）。
+- 2026-10-10：清理分支——本地五个已并入 main 的旧分支（`quick-panel-header-height`、`quick-panel-drag-hotkey`、`quick-panel-pin`、`fix/bailian-deepseek-v41-web-search`、`fix/bailian-web-search-model-table`）和远端两个（`quick-panel-drag-hotkey`、`quick-panel-pin`，均已合入 main）都已删除。远端现在只剩 `main` 和 `gh-pages`（原型页，保留）。
+- 2026-10-10：**以 #1 为准**（用户确认）。#59 关闭时漏掉的那一行已补进 #1 的「Decisions so far」，按关闭顺序排在 #62/#63/#64 前面。
+- 2026-10-10：**#67 以 not planned 关闭**（用户决定）。代码没改过——`AppWindow.openSettings` 仍是 `NSApp.activate()` 后立刻 `openSettings()`、100ms 后 `orderFrontRegardless()` + `makeKey()`；用户判断窗口按钮和 Toggle 画成非激活样式只是视觉问题、不影响使用，v1.0.0 不修。结论已追加到 #1。**至此所有 issue 都关掉了。**
+- 2026-10-10：两件悬着的事情，用户决定**都不动**——v1.1 那批（#46–#54）的结论只有 #45 地图里有、不搬进 #1；CI 保持 push 到 main 和 PR 都跑，不改成只在 PR 时跑。
+- 2026-10-10：本地 `main` 已跟到 `27bca41`（「发布 v1.0.0：安装包脚本与安装指引」，另一个会话推的：新增 `docs/INSTALL.md`、`docs/releases/v1.0.0.md`、`scripts/package-release.sh`，版本号改成 1.0.0，并把「v1 只自用、不发 Release」的决定改成发布给朋友手动安装）。
+- 2026-10-10：#68（Web Search 默认关闭）完成，PR #69 已合（用户真机测过）。决策（用户已确认）：每个新 Conversation 都从关开始、不记住上一次；Settings › General 加「新对话默认联网」开关（默认关）。
 
 ## 偏好补充
 

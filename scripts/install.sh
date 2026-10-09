@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 在本机构建 Chatbot 并安装到 /Applications（见 README 的「安装」）。
+# 在本机构建 Chatbot 并安装到 /Applications（见 README 的「从源码构建和安装」）。
 # 用法：在仓库里运行 ./scripts/install.sh
 set -euo pipefail
 
