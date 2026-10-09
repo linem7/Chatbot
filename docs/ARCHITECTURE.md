@@ -206,14 +206,17 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
 - **平台**：ImageIO 和 PDFKit 只在 Apple 平台上可用，用 `#if canImport` 隔开。相关测试只在 CI 上跑。
 
 ## 7. 系统集成
-- **Hotkey**：使用 KeyboardShortcuts（底层是 Carbon `RegisterEventHotKey`，不需要权限），默认 option+space。用 `isTakenBySystem` 检测和系统快捷键的冲突，冲突时提示。其他 app 注册的同一组合检测不到（Carbon 的非独占注册不报错），只在设置里放一句静态提示。
+- **Hotkey**：两种方式由 `HotkeyController` 二选一注册，选择存在 UserDefaults 的 `hotkeyTrigger`（#64）。
+  - 组合键：使用 KeyboardShortcuts（底层是 Carbon `RegisterEventHotKey`，不需要权限），默认 option+space。用 `isTakenBySystem` 检测和系统快捷键的冲突，冲突时提示。其他 app 注册的同一组合检测不到（Carbon 的非独占注册不报错），只在设置里放一句静态提示。
+  - 连按两次 ⌘：`DoubleCommandMonitor` 同时装全局和本地的 `flagsChanged` + `keyDown` 监视器。修饰键没有单独的按下事件，只能从 `flagsChanged` 的 `keyCode`（54 左 / 55 右）和 `modifierFlags` 推断按下；⌘ 的抬手不算，否则每次双击都会被自己的抬手清掉计时；中间混进别的按键或修饰键就作废，⌘C、⌘V 才不会被当成双击。全局监视器只看得到别的 app 的按键，本地的只看得到自己的，两边都装面板开着时才能双击收起。这需要**辅助功能**权限，没给之前 `apply()` 保留组合键、不装监视器（`AXIsProcessTrusted()` 判断，`applicationDidBecomeActive` 时重看一次）。
+  - 两种方式互斥：换到 ⌘ 双击时 `KeyboardShortcuts.disable`，换回来再 `enable`。
 - **Quick Panel**：`NSPanel` 子类，主要配置如下：
   - `styleMask` 设为 `.nonactivatingPanel` + `.borderless`，并重写 `canBecomeKey = true`；
   - `level = .floating`，`collectionBehavior` 包括 `.canJoinAllSpaces`、`.fullScreenAuxiliary`、`.transient`、`.ignoresCycle`；
   - 内容用 `NSHostingView`；
   - 在 `windowDidResignKey` 中执行 `orderOut`；面板被固定住时（顶栏图钉，#59）`hide()` 直接返回，失焦、Esc、Hotkey 都不再收起，窗口就留在 `.floating` 层级上——「保持在最前」靠的是已有的层级，固定状态只是不再自己 `orderOut`。守卫只放在 `hide()` 这一处，三种收起方式都从它经过；
   - 面板内的快捷键用本地 `NSEvent` monitor 按 keyCode 处理：Esc 隐藏面板，⌘. 停止生成，⌘N 新对话。不用 `.onExitCommand`，因为 AppKit 把 Esc 和 ⌘. 都映射为 `cancelOperation:`，没法区分；输入法正在组字时 Esc 交给输入法；
-  - 按鼠标所在的屏幕定位。
+  - 定位：按鼠标所在的屏幕，偏上居中。顶栏的空当包一个 `NSViewRepresentable`，在 `mouseDown` 里调 `NSWindow.performDrag(with:)` 拖动窗口（#63）——无边框窗口没有标题栏，系统不给拖。`isMovable` 为 true 配合 `performDrag`，`isMovableByWindowBackground` 保持 false，消息区选字才不会被当成拖窗口。拖过一次后 `ChatStore.hasMovedPanel` 置位，之后 `show()` 不再重新定位；这一位和 `isPanelPinned` 一样不写进设置，重启回到偏上居中。
 - **输入框**：用 `NSViewRepresentable` 包装 `NSTextView`，不用 SwiftUI 的 `TextEditor`。一是要在 `textView(_:doCommandBy:)` 里实现 ⏎ 发送、⇧⏎ 换行，输入法正在组字时 ⏎ 由输入法消费，不会误发送；二是面板显示时可以直接 `makeFirstResponder`，不依赖 `@FocusState`。面板不激活 app，⌘C、⌘V 等编辑命令由面板的 `performKeyEquivalent` 直接发给响应链。
 - **菜单栏**：使用 `MenuBarExtra`。图标的三种状态（空闲、生成中、有未读）由 store 驱动。label 会被渲染成静态图片，`.symbolEffect` 不会播放，所以生成中由 store 的计时器每 0.5 秒切换一次帧（正常和变淡两张 template 图片）。
 - **普通窗口（设置窗口、Main Window）**（#46）：

@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) lazy var historyModel = HistoryModel(store: history, chat: chatStore)
     private(set) lazy var settingsNavigation = SettingsNavigation()
     private(set) lazy var launchAtLogin = LaunchAtLogin()
+    private(set) lazy var hotkey = HotkeyController()
     private var quickPanel: QuickPanelController?
     private var cleanup: Task<Void, Never>?
 
@@ -23,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         KeyboardShortcuts.onKeyDown(for: .toggleQuickPanel) { [weak quickPanel] in
             quickPanel?.toggle()
         }
+        // 按设置里选的方式注册：组合键，或者连按两次 ⌘（SPEC §2.1）
+        hotkey.start { [weak quickPanel] in quickPanel?.toggle() }
         chatStore.showQuickPanel = { [weak quickPanel] in
             quickPanel?.show()
         }
@@ -42,6 +45,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         Task { await chatStore.restoreRecentConversation() }
+    }
+
+    /// 回到前台时重看一次「辅助功能」权限：用户多半刚在 System Settings 里把它打开。
+    func applicationDidBecomeActive(_ notification: Notification) {
+        hotkey.refreshPermission()
     }
 
     /// 退出时，正在生成的回答以 Interrupted 保存（SPEC §8）。等它落库再退出，最多等几秒。

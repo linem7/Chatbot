@@ -39,7 +39,10 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.isMovable = false
+        // 只有顶栏能拖（#63）：isMovable 给 performDrag 用；isMovableByWindowBackground 保持 false，
+        // 否则在消息区按住想选字会变成拖窗口
+        panel.isMovable = true
+        panel.isMovableByWindowBackground = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
@@ -58,7 +61,8 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         if NSApp.isHidden { NSApp.unhideWithoutActivation() }
         isShown = true
         store.panelWillShow()
-        positionOnMouseScreen()
+        // 拖过之后就停在拖到的位置，重新唤起不再回到屏幕中间（SPEC §2.2、#63）
+        if !store.hasMovedPanel { positionOnMouseScreen() }
         panel.makeKeyAndOrderFront(nil)
         panel.contentView?.layoutSubtreeIfNeeded()
         composer.focus()
