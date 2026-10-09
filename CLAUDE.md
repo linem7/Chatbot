@@ -4,9 +4,11 @@ macOS 菜单栏 AI 助手，用原生 Swift + SwiftUI 开发。规划阶段已�
 
 ## 任务从哪来
 
-所有工作都由 GitHub issue 驱动（`linem7/Chatbot`）。其中 #1 是 Wayfinder 地图，写着这个阶段的终点、已锁定的前提、已定的决策和尚未讨论的问题。开始任何 ticket 之前，先读 #1 和这个 ticket 本身。
+所有工作都由 GitHub issue 驱动（`linem7/Chatbot`，私有仓库）。规划阶段（Wayfinder 地图 #1）已经结束，现在是实现阶段：实现 ticket 带 `v1` label（#17–#25），按 `docs/ARCHITECTURE.md` §9 的顺序做，每个 ticket 写明了范围、完成标准和依赖。开工前先读这个 ticket，以及它引用的 SPEC 和 ARCHITECTURE 章节。
 
-按 label 区分 ticket 类型：
+这台开发机可能是 Linux，没法构建 macOS app。改动只能靠 CI（PR 时运行）或用户在 Mac 上验证，汇报时要说明哪些内容没有经过编译验证。
+
+规划阶段用过的 ticket 类型（以后再开规划类 ticket 时沿用）：
 - `wayfinder:research`：用 `research` 技能，结论写入 `docs/research/<name>.md`。
 - `wayfinder:grilling`：用 `grilling` 和 `domain-modeling` 技能，逐轮向用户提问，用户确认后才落地。
 - `wayfinder:prototype`、`wayfinder:task`：按 ticket 描述执行。
