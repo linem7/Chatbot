@@ -16,7 +16,7 @@
 - 按 **option+space**（可以改）从任何 app 里唤起 Quick Panel，它出现在当前屏幕的偏上居中位置。
 - 失焦、按 Esc 或再按一次快捷键就收起。回答在后台继续生成，菜单栏图标会提示状态。
 - 10 分钟内再次唤起会接着上一段对话，超过 10 分钟就自动新开。
-- 常驻菜单栏，不占 Dock，不抢焦点，也不弹通知。
+- 常驻菜单栏，平时不占 Dock，不抢焦点，也不弹通知。
 
 ### 2. 图片和文件
 - 把用任意截图工具截的图**直接粘贴**进来提问。也可以用「+」或拖拽加入图片、PDF、文本和代码文件。
@@ -110,7 +110,7 @@ API key 存在 Keychain 里，Keychain 按签名身份判断访问权限。所�
 
 脚本会依次：检查 Xcode、XcodeGen 和签名证书 → 生成工程 → 构建 Release → 退出正在运行的 Chatbot → 删掉旧的 `/Applications/Chatbot.app` 并装上新的 → 校验签名 → 启动。任何一步失败都会停下来，并说明原因。第一次构建要下载依赖，会慢一些。
 
-装好之后，Chatbot 只出现在菜单栏，不出现在 Dock。第一次启动时：
+装好之后，Chatbot 平时只出现在菜单栏；打开 Settings 窗口或主窗口时，会临时出现在 Dock 和 ⌘Tab 里，关掉后消失。第一次启动时：
 
 - 会自动打开 Settings 窗口的 **Connections** 标签页，并选好 DeepSeek 模板。粘贴 API key 后点 **Save**，app 会拉取 Model 列表，这一步同时就是连接测试。
 - 会打开 **Launch at Login**。macOS 会弹一条 **Background Items Added** 的系统通知，这是系统行为，不是 app 发的。

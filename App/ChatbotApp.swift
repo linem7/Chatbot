@@ -99,12 +99,15 @@ enum AppWindow {
     static let mainWindowID = "main"
 
     static func openSettings(with openSettings: OpenSettingsAction) {
+        // 先切成普通 app（出现在 Dock 和 ⌘Tab），再激活，见 RegularWindows
+        RegularWindows.shared.windowDidOpen(.settings)
         NSApp.activate()
         openSettings()
         bringToFront { $0.identifier?.rawValue.contains("Settings") == true }
     }
 
     static func openMainWindow(with openWindow: OpenWindowAction) {
+        RegularWindows.shared.windowDidOpen(.main)
         NSApp.activate()
         openWindow(id: mainWindowID)
         bringToFront { $0.identifier?.rawValue.hasPrefix(mainWindowID) == true }

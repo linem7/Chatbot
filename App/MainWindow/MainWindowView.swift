@@ -25,7 +25,7 @@ struct MainWindowView: View {
             }
         }
         .frame(minWidth: 720, minHeight: 460)
-        .background(StaysVisibleWhenInactive())
+        .regularWindow(.main)
         .task { model.reload() }
         .onChange(of: chat.historyRevision) { model.reload() }
     }
