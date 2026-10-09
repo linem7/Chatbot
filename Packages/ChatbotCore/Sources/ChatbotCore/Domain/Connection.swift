@@ -50,12 +50,6 @@ public struct Connection: Codable, Sendable, Hashable, Identifiable {
     public static func gemini(id: UUID = UUID(), name: String = "Gemini") -> Connection {
         Connection(id: id, name: name, provider: .gemini, baseURL: URL(string: "https://generativelanguage.googleapis.com")!)
     }
-
-    /// 是否是 DeepSeek 的官方接口。DeepSeek 需要一些非标准字段（例如关闭思考的 `thinking`）。
-    var isDeepSeek: Bool {
-        guard let host = baseURL.host?.lowercased() else { return false }
-        return host == "deepseek.com" || host.hasSuffix(".deepseek.com")
-    }
 }
 
 /// 某个 Connection 下可调用的一个 Model。

@@ -81,7 +81,7 @@ enum ModelEvent {
 | | OpenAI 兼容（DeepSeek 等） | Anthropic Messages | Gemini `generateContent` |
 |---|---|---|---|
 | 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST /v1/messages` | `POST /v1beta/models/{m}:streamGenerateContent?alt=sse` |
-| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | 能关就关（ADR-0002）：capabilities 里 `thinking.types.disabled` 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
+| 关闭思考 | 按 Platform（base URL 的 host）发：DeepSeek 发 `thinking: {type: "disabled"}`；OpenRouter 发 `reasoning: {enabled: false}`，`/models` 报告 `reasoning.mandatory` 的模型改发它支持的最低档 `reasoning.effort`，缓存里没有 `reasoning` 信息时只给 `deepseek/` 模型发；百炼发 `enable_thinking: false`（只会思考的 deepseek-r1、QwQ、QVQ、`*-thinking` 不发）；不认识的服务什么都不发。不发 DeepSeek 不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | 能关就关（ADR-0002）：capabilities 里 `thinking.types.disabled` 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
 | system prompt | `role: "system"` 消息 | 顶层 `system` | 顶层 `systemInstruction` |
 | 图片 | `image_url` + base64 data URL | `image` block，base64 | `inlineData`，base64 |
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |

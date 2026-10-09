@@ -188,6 +188,127 @@ struct OpenAICompatibleAdapterTests {
         let body = try JSONDecoder().decode(JSONValue.self, from: try #require(sent.body))
         guard case .object(let fields) = body else { Issue.record("body 不是对象"); return }
         #expect(fields["thinking"] == nil)
+        #expect(fields["reasoning"] == nil)
+        #expect(fields["enable_thinking"] == nil)
+    }
+
+    // MARK: 按平台关闭思考（ADR-0002）
+
+    private func sentFields(_ request: ModelRequest) async throws -> [String: JSONValue] {
+        let transport = StubTransport(body: chunk(nil, finishReason: "stop"))
+        _ = try await collect(transport, request)
+        let body = try JSONDecoder().decode(JSONValue.self, from: try #require(transport.requests.first?.body))
+        guard case .object(let fields) = body else { Issue.record("body 不是对象"); return [:] }
+        return fields
+    }
+
+    private func connection(_ baseURL: String, models: [ModelInfo] = []) -> Connection {
+        Connection(name: "平台", provider: .openAICompatible, baseURL: URL(string: baseURL)!, models: models)
+    }
+
+    @Test func openRouterRequestDisablesReasoning() async throws {
+        var request = request(connection: connection("https://openrouter.ai/api/v1"))
+        request.modelID = "deepseek/deepseek-v4.1-flash"
+        let fields = try await sentFields(request)
+        #expect(fields["reasoning"] == .object(["enabled": .bool(false)]))
+        #expect(fields["thinking"] == nil)
+        #expect(fields["enable_thinking"] == nil)
+    }
+
+    @Test func openRouterModelsThatMustReasonGetTheirLowestEffort() async throws {
+        // Fixtures/openrouter-models.json：2026-10-09 无鉴权请求 https://openrouter.ai/api/v1/models 的结果，
+        // 只留了三个模型和几个字段
+        let models = try await OpenAICompatibleAdapter(transport: StubTransport(body: try Fixture.string("openrouter-models.json")))
+            .listModels(connection("https://openrouter.ai/api/v1"), apiKey: "sk-test")
+        let openRouter = connection("https://openrouter.ai/api/v1", models: models)
+
+        var mandatory = request(connection: openRouter)
+        mandatory.modelID = "google/gemini-3.8-flash"
+        #expect(try await sentFields(mandatory)["reasoning"] == .object(["effort": .string("low")]))
+
+        var optional = request(connection: openRouter)
+        optional.modelID = "deepseek/deepseek-v4.1-flash"
+        #expect(try await sentFields(optional)["reasoning"] == .object(["enabled": .bool(false)]))
+    }
+
+    @Test func openRouterConnectionsSavedBeforeReasoningInfoOnlyDisableDeepSeek() async throws {
+        // #53 之前保存的 Connection：缓存的 Model 没有 providerData
+        let old = connection("https://openrouter.ai/api/v1", models: [
+            ModelInfo(id: "deepseek/deepseek-v4.1-flash", capabilities: .conservative),
+            ModelInfo(id: "google/gemini-3.8-flash", capabilities: .conservative),
+        ])
+        var deepSeek = request(connection: old)
+        deepSeek.modelID = "deepseek/deepseek-v4.1-flash"
+        #expect(try await sentFields(deepSeek)["reasoning"] == .object(["enabled": .bool(false)]))
+
+        var gemini = request(connection: old)
+        gemini.modelID = "google/gemini-3.8-flash"
+        #expect(try await sentFields(gemini)["reasoning"] == nil)
+    }
+
+    @Test func lowestEffortDoesNotDependOnListOrder() async throws {
+        // 构造的 reasoning 对象：档位故意按从低到高排列
+        let model = ModelInfo(
+            id: "vendor/must-reason", capabilities: .conservative,
+            providerData: .object(["reasoning": .object([
+                "mandatory": .bool(true),
+                "supported_efforts": .array([.string("medium"), .string("high"), .string("max")]),
+            ])])
+        )
+        var request = request(connection: connection("https://openrouter.ai/api/v1", models: [model]))
+        request.modelID = "vendor/must-reason"
+        #expect(try await sentFields(request)["reasoning"] == .object(["effort": .string("medium")]))
+    }
+
+    @Test(arguments: [
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+        "https://llm-abc123.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    ])
+    func bailianRequestDisablesThinking(baseURL: String) async throws {
+        var request = request(connection: connection(baseURL))
+        request.modelID = "deepseek-v4-flash"
+        let fields = try await sentFields(request)
+        #expect(fields["enable_thinking"] == .bool(false))
+        #expect(fields["thinking"] == nil)
+        #expect(fields["reasoning"] == nil)
+    }
+
+    @Test(arguments: ["deepseek-r1", "deepseek-r1-0528", "qwq-plus", "qvq-max", "qwen3-235b-a22b-thinking-2507"])
+    func bailianThinkingOnlyModelsGetNoThinkingField(modelID: String) async throws {
+        var request = request(connection: connection("https://dashscope.aliyuncs.com/compatible-mode/v1"))
+        request.modelID = modelID
+        #expect(try await sentFields(request)["enable_thinking"] == nil)
+    }
+
+    @Test func platformIsRecognizedByHost() {
+        #expect(Platform(host: "api.deepseek.com") == .deepSeek)
+        #expect(Platform(host: "openrouter.ai") == .openRouter(.global))
+        #expect(Platform(host: "us.openrouter.ai") == .openRouter(.us))
+        #expect(Platform(host: "eu.openrouter.ai") == .openRouter(.eu))
+        #expect(Platform(host: "dashscope.aliyuncs.com") == .bailian)
+        #expect(Platform(host: "dashscope-us.aliyuncs.com") == .bailian)
+        #expect(Platform(host: "cn-hongkong.dashscope.aliyuncs.com") == .bailian)
+        #expect(Platform(host: "trial.cn-beijing.maas.aliyuncs.com") == .bailian)
+        #expect(Platform(host: "LLM-X.AP-SOUTHEAST-1.MAAS.ALIYUNCS.COM") == .bailian)
+        #expect(Platform(host: "oss-cn-beijing.aliyuncs.com") == nil)
+        #expect(Platform(host: "notopenrouter.ai") == nil)
+        #expect(Platform(host: "localhost") == nil)
+        #expect(Platform(host: nil) == nil)
+    }
+
+    @Test func serverWebSearchSupportFollowsPlatformAndEndpoint() {
+        #expect(Platform.deepSeek.supportsServerWebSearch == false)
+        #expect(Platform.openRouter(.global).supportsServerWebSearch)
+        #expect(Platform.openRouter(.us).supportsServerWebSearch)
+        #expect(Platform.openRouter(.eu).supportsServerWebSearch == false)
+        #expect(Platform.bailian.supportsServerWebSearch)
+    }
+
+    @Test func euEndpointStillDisablesReasoning() async throws {
+        var request = request(connection: connection("https://eu.openrouter.ai/api/v1"))
+        request.modelID = "deepseek/deepseek-v4.1-flash"
+        #expect(try await sentFields(request)["reasoning"] == .object(["enabled": .bool(false)]))
     }
 
     // MARK: 附件

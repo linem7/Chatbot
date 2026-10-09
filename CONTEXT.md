@@ -14,6 +14,10 @@ _Avoid_: 服务商、后端、API 类型
 用户配置的一条模型接入，包括名称、所属 Provider、base URL、API key 和可用的 Model 列表。例如「DeepSeek」是一条走 OpenAI 兼容 Provider 的 Connection。
 _Avoid_: 配置实例、Service、Account、Endpoint
 
+**Platform**:
+提供模型 API 的平台，按 Connection 的 base URL 的 host 识别，目前认识 DeepSeek 官方、OpenRouter、阿里云百炼。同一个 Provider 下，不同 Platform 需要不同的非标准字段（例如关闭思考的写法）。自己部署的服务和不认识的中转不属于任何 Platform。
+_Avoid_: 中转（中转是用户自建或第三方的转发服务，不一定是某个 Platform）、Provider（Provider 是协议族）
+
 **Model**:
 某个 Connection 下可调用的一个具体模型，用 API 中的模型 ID 标识，例如 `deepseek-flash`。界面上显示为「Connection / Model」。
 

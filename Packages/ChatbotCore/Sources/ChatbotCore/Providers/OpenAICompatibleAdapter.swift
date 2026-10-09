@@ -3,8 +3,9 @@ import Foundation
 /// OpenAI 兼容 Provider 的 adapter（DeepSeek 等），ARCHITECTURE §3.2。
 ///
 /// - 端点是 `POST {base}/chat/completions`，DeepSeek 的 base URL 不带 `/v1`。
-/// - 对 DeepSeek 发 `thinking: {type: "disabled"}` 关闭思考（ADR-0002）；
-///   不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls`、`max_completion_tokens`、`logit_bias`），
+/// - 按平台关闭思考（ADR-0002，平台见 `Platform`）：DeepSeek 发 `thinking: {type: "disabled"}`，
+///   OpenRouter 发 `reasoning: {enabled: false}`，百炼发 `enable_thinking: false`；其他服务什么都不发。
+/// - 不发 DeepSeek 不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls`、`max_completion_tokens`、`logit_bias`），
 ///   也不用 `developer` role。
 /// - v1 只解码正文和 `finish_reason`；tool call 的增量暂不解码（v1 没有 app 侧工具）。
 public struct OpenAICompatibleAdapter: ProviderAdapter {
@@ -121,12 +122,20 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
                 messages.append(ChatMessage(role: "user", content: .init(parts)))
             }
         }
-        let body = ChatRequestBody(
-            model: request.modelID,
-            messages: messages,
-            stream: true,
-            thinking: request.connection.isDeepSeek ? .init(type: "disabled") : nil
-        )
+        var body = ChatRequestBody(model: request.modelID, messages: messages, stream: true)
+        switch request.connection.platform {
+        case .deepSeek:
+            body.thinking = .init(type: "disabled")
+        case .openRouter:
+            body.reasoning = openRouterReasoning(for: request)
+        case .bailian:
+            // 只会思考的模型（deepseek-r1、QwQ、QVQ、*-thinking）不接受关闭，发了可能报错
+            let id = request.modelID.lowercased()
+            let thinkingOnly = ["deepseek-r1", "qwq", "qvq"].contains { id.hasPrefix($0) } || id.contains("thinking")
+            body.enableThinking = thinkingOnly ? nil : false
+        case nil:
+            break
+        }
         return HTTPRequest(
             method: "POST",
             url: request.connection.baseURL.appendingPathComponent("chat/completions"),
@@ -204,6 +213,24 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
         }
     }
 
+    /// OpenRouter 的统一 `reasoning` 参数，按 `/models` 报告的 `reasoning` 对象（存在 providerData 里）决定：
+    /// - `mandatory` 的模型关不掉思考，发 `enabled: false` 会被拒绝，改发它支持的最低档 effort；没有档位可选就什么都不发。
+    /// - 其他模型发 `enabled: false`。
+    /// - 没有 `reasoning` 信息（#53 之前保存的 Connection，或者这个模型不会思考）：只给 DeepSeek 发 `enabled: false`
+    ///   （OpenRouter 上的 DeepSeek 都能关），其他模型什么都不发，免得关不掉思考的模型被拒；重新拉取 Model 列表后按上面处理。
+    private static func openRouterReasoning(for request: ModelRequest) -> ChatRequestBody.Reasoning? {
+        guard let reasoning = request.connection.models.first(where: { $0.id == request.modelID })?.providerData?["reasoning"] else {
+            return request.modelID.lowercased().hasPrefix("deepseek/") ? .init(enabled: false) : nil
+        }
+        guard reasoning["mandatory"]?.boolValue == true else { return .init(enabled: false) }
+        guard case .array(let efforts)? = reasoning["supported_efforts"] else { return nil }
+        let supported = Set(efforts.compactMap(\.stringValue))
+        return openRouterEffortsFromLowest.first(where: supported.contains).map { .init(effort: $0) }
+    }
+
+    /// OpenRouter 的 effort 档位，从低到高（`none` 是关闭，关不掉思考的模型不接受）。接口没有承诺 `supported_efforts` 的顺序。
+    private static let openRouterEffortsFromLowest = ["minimal", "low", "medium", "high", "xhigh", "max"]
+
     /// 把其他错误统一成 ChatError；取消原样往外传。
     private static func normalize(_ error: any Error) -> any Error {
         if error is ChatError || error is CancellationError { return error }
@@ -216,11 +243,25 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
 
 private struct ChatRequestBody: Encodable {
     struct Thinking: Encodable { var type: String }
+    struct Reasoning: Encodable {
+        var enabled: Bool?
+        var effort: String?
+    }
 
     var model: String
     var messages: [ChatMessage]
     var stream: Bool
+    /// DeepSeek 官方
     var thinking: Thinking?
+    /// OpenRouter
+    var reasoning: Reasoning?
+    /// 百炼
+    var enableThinking: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case model, messages, stream, thinking, reasoning
+        case enableThinking = "enable_thinking"
+    }
 }
 
 private struct ChatMessage: Encodable {
@@ -308,9 +349,11 @@ private struct ModelList: Decodable {
         var name: String?
         var contextWindow: Int?
         var inputModalities: [String]?
+        /// OpenRouter 报告的思考选项（`mandatory`、`supported_efforts` 等），存进 providerData，关闭思考时用
+        var reasoning: JSONValue?
 
         enum CodingKeys: String, CodingKey {
-            case id, name
+            case id, name, reasoning
             case contextWindow = "context_window"
             case inputModalities = "input_modalities"
         }
@@ -320,7 +363,8 @@ private struct ModelList: Decodable {
         var modelInfo: ModelInfo {
             var capabilities = ModelCapabilities.conservative
             if let inputModalities { capabilities.imageInput = inputModalities.contains("image") }
-            return ModelInfo(id: id, displayName: name, contextWindow: contextWindow, capabilities: capabilities)
+            let providerData: JSONValue? = reasoning.flatMap { $0 == .null ? nil : .object(["reasoning": $0]) }
+            return ModelInfo(id: id, displayName: name, contextWindow: contextWindow, capabilities: capabilities, providerData: providerData)
         }
     }
 
