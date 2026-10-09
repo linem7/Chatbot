@@ -34,7 +34,7 @@
 
 ## 其他
 
-- Quick Panel 原型在 `prototype/quick-panel` 分支上，在线查看：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH 。最终选定的是「B · 聊天窗式」，结论记在 #15 里。GitHub Pages 目前是关闭的。
+- 选定的 Quick Panel 方案「B · 聊天窗式」可以在线查看：https://linem7.github.io/Chatbot/ 。源在孤儿分支 `gh-pages`，结论记在 #15 里。实现 #19 时，以它为界面参考，但要用 SwiftUI 重写，不要照搬原型的代码。
 
 ## 建议使用的技能
 

@@ -23,7 +23,7 @@
 - 首次启动和改键时会检测冲突，如果和系统或其他 app 的快捷键冲突，会给出提示。注意 ChatGPT 桌面版默认也用 option+space。
 
 ### 2.2 外观（以 #15 原型的「聊天窗式」为准）
-原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH （源文件在 `prototype/quick-panel` 分支）
+原型：https://linem7.github.io/Chatbot/ （源在 `gh-pages` 分支）
 
 - 出现在**鼠标所在屏幕的偏上居中**位置。宽度固定，高度也固定（约 560pt，最多占屏幕高度的 70%），不能拖动。
 - 能显示在全屏 app 上方，也能在所有桌面空间里出现。

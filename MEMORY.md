@@ -20,13 +20,13 @@
 - #12（本地历史）已关闭：用 GRDB 存储（ADR-0004），30 天静默清理，标题由模型生成，支持全文搜索，永远不做导出。
 - #13（设置）已关闭：key 存 Keychain，设置是独立窗口，分三个标签页；去掉了「手动覆盖 Model Capabilities」（修改了 #7 的结论，已在 #7 补充说明）；界面做中英文，跟随系统。
 - #14（工程基线）已关闭：最低支持 macOS 26；工程用 XcodeGen 生成；分层是 App target 加本地 SPM 包 ChatbotCore；用自签名证书签名、不做公证（ADR-0005）；CI 负责构建、测试和按 tag 发布；更新只做「有新版本」提示；日志只用 os.Logger；Swift 6 + Swift Testing；bundle id 是 com.linem7.Chatbot。
-- #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。原型在 `prototype/quick-panel` 分支上，不进 main。
+- #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。B 方案的原型发布在 GitHub Pages：https://linem7.github.io/Chatbot/ （源是孤儿分支 `gh-pages`，只有 `index.html` 和 `.nojekyll`）。`prototype/quick-panel` 分支已删除；含三个变体的完整版只剩 Claude Artifact 那份。
 - #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
 - 2026-10-09：#16 和地图 #1 都已关闭，**规划阶段结束**。功能以 `docs/SPEC.md` 为准，实现以 `docs/ARCHITECTURE.md` 为准。
 - v1 **只自用**：在本机构建安装；不发 GitHub Release，不做更新检查。
 - 2026-10-09 应用户要求，仓库最终改为 **public**，这样 macOS runner 不收费。CI 在 push 到 main 和 PR 时都跑构建和测试。
 - 实现 ticket 按 ARCHITECTURE §9 的顺序创建，都带 `v1` label。下一步从「实现 1：工程骨架」开始。
-- 仓库可见性在 2026-10-09 来回改过几次，最终是 **public**。GitHub Pages 在仓库改回私有时被撤下了，之后没有重新开启。
+- 仓库可见性在 2026-10-09 来回改过几次，最终是 **public**。GitHub Pages 已从 `gh-pages` 分支重新开启。
 
 ## 偏好补充
 
