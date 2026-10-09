@@ -1,10 +1,16 @@
 # 所有请求都关闭模型思考，UI 也不展示推理过程
 
 > 2026-10-09 修订（#23）：Anthropic 的部分模型无法关闭思考，改为按 `/v1/models` 的 capabilities 处理，见下文的 Anthropic 一段。主旨不变。
+>
+> 2026-10-09 修订（#53）：经 OpenRouter、阿里云百炼使用 DeepSeek 时，DeepSeek V4 默认开着思考，改为按 Platform 发各自的关闭字段，见下文的 OpenAI 兼容一段。主旨不变。
 
 这个 app 的定位是「快速解决问题」，需要深度推理的复杂问题，用户会去别的工具里解决。思考会明显拖慢首字出现的时间，所以所有请求都尽量关闭思考：
 
-- **DeepSeek**：发 `thinking: disabled`。
+- **OpenAI 兼容**：按 Platform（base URL 的 host）发各自的关闭字段。
+  - DeepSeek 官方：发 `thinking: disabled`。
+  - OpenRouter：发 `reasoning: {enabled: false}`；`/models` 报告思考关不掉（`reasoning.mandatory`）的模型，发它支持的最低档 `reasoning.effort`。
+  - 阿里云百炼：发 `enable_thinking: false`；只会思考的模型（deepseek-r1、QwQ 等）不发。
+  - 不认识的服务什么都不发，以免请求被拒。
 - **Anthropic**：能关就关，按 `/v1/models` 的 capabilities 处理。
   - Model 能关闭思考（`thinking.types.disabled.supported` 为 true）时，发 `thinking: {type: "disabled"}`。
   - Claude Sonnet 5.5 发 disabled 会返回 400，但可以用 `thinking: {type: "between_tools"}` 关闭（effort 不超过 high，我们用 low）。
