@@ -141,6 +141,18 @@ struct HistoryStoreTests {
         #expect(try await store.search("盘").map(\.id) == [match.id])
     }
 
+    @Test(arguments: [
+        ("盘", true), ("磁盘", true), ("时间机器", true),
+        ("ui", true), ("UI", true), ("SwiftUI", true),
+        ("硬盘", false), ("xy", false),
+    ])
+    func shortAndLongQueriesBothWork(query: String, matches: Bool) async throws {
+        // trigram 的 MATCH 对少于 3 个字符的查询什么都匹配不到，短查询要退回 LIKE
+        let store = try openStore()
+        let conversation = try await saveExchange(store, question: "q", answer: "用时间机器备份磁盘，界面是 SwiftUI 写的")
+        #expect(try await store.search(query).map(\.id) == (matches ? [conversation.id] : []))
+    }
+
     @Test func searchIsCaseInsensitiveAndCoversTitles() async throws {
         let store = try openStore()
         let conversation = try await saveExchange(store, question: "q", answer: "Use SwiftUI here")

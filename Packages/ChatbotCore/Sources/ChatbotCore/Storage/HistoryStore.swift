@@ -70,7 +70,9 @@ public final class HistoryStore: MessageStore, Sendable {
     /// 全文搜索标题和所有消息正文，结果按最后一条消息的时间倒序。查询为空时返回全部。
     ///
     /// 用 trigram 分词：中文没有空格，默认的 unicode61 分词会把一整段中文当成一个词，搜不到其中的词。
-    /// 3 个字符及以上用 MATCH 走索引；更短的（中文常见的两个字的词）用 LIKE，对这个量级的数据足够快。
+    /// trigram 的 MATCH 对少于 3 个字符的查询匹配不到任何结果，所以 3 个字符及以上用 MATCH 走索引；
+    /// 更短的（中文常见的两个字的词）退回 LIKE。这种 LIKE 用不上 trigram 索引，是全表扫描，
+    /// 对单机的个人历史足够快。
     public func search(_ query: String) async throws -> [Conversation] {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         if query.isEmpty { return try await conversations() }
@@ -144,7 +146,7 @@ public final class HistoryStore: MessageStore, Sendable {
     /// 静默删除最后一条消息在 30 天前的 Conversation，连同附件。返回删除的个数。
     @discardableResult
     public func deleteExpiredConversations(now: Date = Date()) async throws -> Int {
-        let cutoff = now.addingTimeInterval(-Self.retention).timeIntervalSince1970
+        let cutoff = now.addingTimeInterval(-Self.retention).timeIntervalSinceReferenceDate
         let ids = try await database.write { db in
             try Self.delete(where: "lastMessageAt < ?", arguments: [cutoff], db)
         }
@@ -174,7 +176,8 @@ extension HistoryStore {
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1") { db in
-            // 时间一律存 Unix 秒（Double），读回来和原值完全相同
+            // 时间一律存 timeIntervalSinceReferenceDate（自 2001-01-01 起的秒数，Double）。
+            // 这是 Date 内部的表示，读回来和原值完全相同；换算成 Unix 秒会有舍入误差。
             try db.create(table: "conversation") { t in
                 t.primaryKey("id", .text)
                 t.column("title", .text).notNull()
@@ -249,7 +252,7 @@ extension HistoryStore {
             arguments: [
                 conversation.id.uuidString, conversation.title, conversation.titleIsGenerated,
                 conversation.connectionID.uuidString, conversation.modelID, conversation.webSearchEnabled,
-                conversation.createdAt.timeIntervalSince1970, conversation.lastMessageAt.timeIntervalSince1970,
+                conversation.createdAt.timeIntervalSinceReferenceDate, conversation.lastMessageAt.timeIntervalSinceReferenceDate,
             ]
         )
     }
@@ -258,7 +261,7 @@ extension HistoryStore {
     private static func touch(_ id: UUID, at date: Date, _ db: Database) throws {
         try db.execute(
             sql: "UPDATE conversation SET lastMessageAt = max(lastMessageAt, ?) WHERE id = ?",
-            arguments: [date.timeIntervalSince1970, id.uuidString]
+            arguments: [date.timeIntervalSinceReferenceDate, id.uuidString]
         )
     }
 
@@ -279,7 +282,7 @@ extension HistoryStore {
             arguments: [
                 message.id.uuidString, conversationID.uuidString, conversationID.uuidString,
                 message.role.rawValue, status, errorCategory, errorDetail,
-                content, message.markdownText, message.createdAt.timeIntervalSince1970,
+                content, message.markdownText, message.createdAt.timeIntervalSinceReferenceDate,
             ]
         )
     }
@@ -299,8 +302,8 @@ extension HistoryStore {
             connectionID: try uuid(row["connectionID"]),
             modelID: row["modelID"],
             webSearchEnabled: row["webSearchEnabled"],
-            createdAt: Date(timeIntervalSince1970: row["createdAt"]),
-            lastMessageAt: Date(timeIntervalSince1970: row["lastMessageAt"])
+            createdAt: Date(timeIntervalSinceReferenceDate: row["createdAt"]),
+            lastMessageAt: Date(timeIntervalSinceReferenceDate: row["lastMessageAt"])
         )
     }
 
@@ -315,7 +318,7 @@ extension HistoryStore {
             role: role,
             status: try decodeStatus(row["status"], category: row["errorCategory"], detail: row["errorDetail"]),
             content: try JSONDecoder().decode([ContentBlock].self, from: Data(content.utf8)),
-            createdAt: Date(timeIntervalSince1970: row["createdAt"])
+            createdAt: Date(timeIntervalSinceReferenceDate: row["createdAt"])
         )
     }
 
