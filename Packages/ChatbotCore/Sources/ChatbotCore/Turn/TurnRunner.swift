@@ -12,6 +12,9 @@ public struct TurnInput: Sendable {
     public var userMessage: Message
     /// userMessage 引用的附件（AttachmentIntake 处理好的）。之前的消息的附件由 store 读出来。
     public var attachments: [Attachment]
+    /// Retry 时填上旧回答的 id：新回答沿用这个 id，落库时原地覆盖旧回答，位置不变（CONTEXT.md 的 Retry）。
+    /// 这时 userMessage 是原来那条用户 Message（同一个 id），history 是它之前的消息。
+    public var replacingAnswerID: UUID?
 
     public init(
         conversation: Conversation,
@@ -20,7 +23,8 @@ public struct TurnInput: Sendable {
         systemPrompt: String,
         history: [Message],
         userMessage: Message,
-        attachments: [Attachment] = []
+        attachments: [Attachment] = [],
+        replacingAnswerID: UUID? = nil
     ) {
         self.conversation = conversation
         self.connection = connection
@@ -29,6 +33,7 @@ public struct TurnInput: Sendable {
         self.history = history
         self.userMessage = userMessage
         self.attachments = attachments
+        self.replacingAnswerID = replacingAnswerID
     }
 }
 
@@ -94,7 +99,7 @@ public struct TurnRunner: Sendable {
     }
 
     private func execute(_ input: TurnInput, onUpdate: (Message) -> Void) async -> Message {
-        var answer = Message(role: .assistant, status: .streaming, content: [])
+        var answer = Message(id: input.replacingAnswerID ?? UUID(), role: .assistant, status: .streaming, content: [])
         var builder = AnswerBuilder(provider: input.connection.provider)
         let adapter = makeAdapter(input.connection)
         let model = input.connection.models.first { $0.id == input.conversation.modelID }

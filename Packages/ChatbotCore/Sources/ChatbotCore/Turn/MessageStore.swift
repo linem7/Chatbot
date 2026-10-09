@@ -9,7 +9,8 @@ public protocol MessageStore: Sendable {
     /// 必须是 upsert：Retry 会用同一条用户 Message（同一个 id）再执行一次 Turn，
     /// 这时不能新增一条，原来的位置也不变，附件也不重复保存。
     func saveUserMessage(_ message: Message, attachments: [Attachment], in conversation: Conversation) async throws
-    /// Turn 结束（complete / interrupted / failed）时保存 assistant Message。同一个 id 只会保存一次。
+    /// Turn 结束（complete / interrupted / failed）时保存 assistant Message。
+    /// 同一个 id 再次保存时原地覆盖（Retry 沿用旧回答的 id），位置不变，保留第一次保存时的 createdAt。
     func saveAssistantMessage(_ message: Message, conversationID: UUID) async throws
     /// 一个 Conversation 里所有用户 Message 的附件，按保存顺序。继续对话时要把它们再发给模型。
     func attachments(in conversationID: UUID) async throws -> [Attachment]
