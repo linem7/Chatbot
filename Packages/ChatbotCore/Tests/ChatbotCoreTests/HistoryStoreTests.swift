@@ -112,6 +112,20 @@ struct HistoryStoreTests {
         #expect(try await store.messages(in: conversation.id) == [user, answer])
     }
 
+    @Test func savingTheSameUserMessageAgainIsAnUpsert() async throws {
+        // Retry 会用同一条用户 Message 再执行一次 Turn
+        let store = try openStore()
+        let conversation = conversation()
+        let question = Message.user("q")
+        let answer = Message(role: .assistant, status: .failed(.network), content: [])
+        try await store.saveUserMessage(question, in: conversation)
+        try await store.saveAssistantMessage(answer, conversationID: conversation.id)
+        try await store.saveUserMessage(question, in: conversation)
+
+        #expect(try await store.messages(in: conversation.id) == [question, answer])
+        #expect(try await store.conversations().count == 1)
+    }
+
     @Test func conversationsAreSortedByLastMessageNewestFirst() async throws {
         let store = try openStore()
         let old = try await saveExchange(store, question: "旧", answer: "a", at: Date(timeIntervalSince1970: 1_000))

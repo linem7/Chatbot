@@ -68,6 +68,14 @@ struct TurnRunnerTests {
         #expect(await store.messages(in: input.conversation.id) == [input.userMessage, final])
     }
 
+    @Test func inMemoryStoreTreatsTheSameUserMessageAsAnUpsert() async throws {
+        let question = Message.user("q")
+        let conversation = Conversation(connectionID: connection.id, modelID: "deepseek-flash")
+        await store.saveUserMessage(question, in: conversation)
+        await store.saveUserMessage(question, in: conversation)
+        #expect(await store.messages(in: conversation.id) == [question])
+    }
+
     @Test func pauseTurnSendsTheAnswerSoFarBackAndContinues() async throws {
         let adapter = ScriptedAdapter([
             [.event(.textDelta("A")), .event(.finished(.pauseTurn))],

@@ -72,5 +72,5 @@ Message 的一种状态：Turn 中途出错，已经收到的部分内容保留�
 _Avoid_: Interrupted（出错不是中断）、Error Message
 
 **Retry**:
-当 Conversation 的最后一条 assistant Message 是 Interrupted 或出错时，用同一条用户 Message 重新执行一次 Turn，新的回答替换旧的。只能对最后一条使用。
+当 Conversation 的最后一条 assistant Message 是 Interrupted 或 Failed 时，用同一条用户 Message 重新执行一次 Turn，新的回答替换旧的。只能对最后一条使用。
 _Avoid_: 重新生成、Regenerate
