@@ -80,17 +80,17 @@ enum ModelEvent {
 
 | | OpenAI 兼容（DeepSeek 等） | Anthropic Messages | Gemini `generateContent` |
 |---|---|---|---|
-| 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST /v1/messages` | `POST /v1beta/models/{m}:streamGenerateContent?alt=sse` |
+| 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST {base}/v1/messages`（经中转、OpenRouter 时 base URL 填到 `/v1` 之前） | `POST {base}/v1beta/models/{m}:streamGenerateContent?alt=sse` |
 | 关闭思考 | 按 Platform（base URL 的 host）发：DeepSeek 发 `thinking: {type: "disabled"}`；OpenRouter 发 `reasoning: {enabled: false}`，`/models` 报告 `reasoning.mandatory` 的模型改发它支持的最低档 `reasoning.effort`，缓存里没有 `reasoning` 信息时只给 `deepseek/` 模型发；百炼发 `enable_thinking: false`（只会思考的 deepseek-r1、QwQ、QVQ、`*-thinking` 不发）；不认识的服务什么都不发。不发 DeepSeek 不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | 能关就关（ADR-0002）：capabilities 里 `thinking.types.disabled` 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
 | system prompt | `role: "system"` 消息 | 顶层 `system` | 顶层 `systemInstruction` |
 | 图片 | `image_url` + base64 data URL | `image` block，base64 | `inlineData`，base64 |
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |
 | 结束标记 | `data: [DONE]`；DeepSeek 的 usage 挂在最后一个内容 chunk 上（v1 不使用） | `event: message_stop`；流中可能出现 `event: error` | 带 `finishReason` 的 chunk 加 EOF |
 | 必须原样回传的数据 | 无（思考已关闭） | 整串原生内容块：`thinking`（含 `signature`）、`server_tool_use`、`web_search_tool_result`（含 `encrypted_content`）、带 `citations` 的 `text`（含 `encrypted_index`） | `thoughtSignature`（必须留在原来的 Part 上） |
-| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models`（分页）的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported`；capabilities 原文和 `max_tokens` 存进 ModelInfo，adapter 判断思考、effort 和 `max_tokens` 时用 | 内置表（按模型名判断），接口只提供 token 上限 |
+| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models`（分页）的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported`；capabilities 原文和 `max_tokens` 存进 ModelInfo，adapter 判断思考、effort 和 `max_tokens` 时用；接口没报告 capabilities 时（中转多半只返回 OpenAI 风格的列表）按内置表 `AnthropicModelTable` 兜底：`claude-*` 视为支持图片和搜索，思考和 effort 也按表处理，别家的模型不列出来 | 内置表（按模型名判断），接口只提供 token 上限；中转返回 OpenAI 风格的列表（`data[].id`）时同样按内置表 |
 
 **Anthropic adapter 的实现要点**（#23）：
-- 请求：`POST {base}/v1/messages`，头部 `x-api-key` 和 `anthropic-version: 2023-06-01`。`max_tokens` 取 Model 报告的上限，最多 64000；不知道上限时用 16000。
+- 请求：`POST {base}/v1/messages`，头部 `x-api-key` 和 `anthropic-version: 2023-06-01`。OpenRouter 的 Messages 端点（base URL `https://openrouter.ai/api`）只认 `Authorization: Bearer`，按 Platform 改发这个头；其他中转发 `x-api-key`，不两个都发（#51）。`max_tokens` 取 Model 报告的上限，最多 64000；不知道上限时用 16000。
 - Web Search 仍用 `web_search_20250305`（官方文档仍以它配 claude-opus-5-5 示例）。更新的版本走代码执行做动态过滤，更慢，响应里还会多出代码执行块。
 - 原样回传：流里每个完整的内容块通过 `providerData` 交给 TurnRunner，按顺序累积在 assistant Message 的第一个块 `opaque(.anthropic, [原生块…])` 里。complete 的回答（以及 `pause_turn` 续接时进行中的回答）逐字发回这一串；interrupted 或 failed 的回答里可能有不完整的工具块，只发文字。
 - 思考块的签名绑定了 `system`、`tools` 和之前的消息。system 里的日期变了、用户改了 system prompt、地球按钮切换了 tools，都会让原样回传的思考块对不上：
@@ -98,6 +98,7 @@ enum ModelEvent {
   - `between_tools`（Sonnet 5.5）不接受 `block_binding`：之前完成的回答里的思考块（工具调用之间的进度说明）一律不回传，每次请求都这样处理，前缀始终一致；`pause_turn` 续接时进行中的回答照常原样发回；
   - `disabled` 的 Model 不产生思考块，`block_binding` 和 disabled 一起发也会 400。
 - capabilities 里有没有 `between_tools` 这一项还没有官方示例，按「有就用、没有就当不支持」宽松处理；没有时 Sonnet 5.5 走 adaptive + drop_block，同样能用。
+- 经中转（#49、#51）：接口没报告 capabilities 时按模型名查内置表 `AnthropicModelTable`。模型名先统一写法（去掉 `anthropic/` 这类厂商前缀、版本里的点号换成 `-`）再匹配；表里给出关闭思考的方式（disabled、between_tools、关不掉走 adaptive、不发就不思考）和是否支持 low effort。表里没有的模型什么都不发。接口报告了 capabilities 时以接口为准。
 - `pause_turn` 最多续接 5 次，到上限还没结束时回答标成 failed（只回传文字），避免下一次 Turn 回传一个没有结果的 `server_tool_use`。
 - Citation：adapter 在 text 块结束时按「这次调用输出的正文」给出 UTF-16 范围，TurnRunner 换算成所在 text 块里的偏移。
 - `stop_reason`：`refusal`（安全分类器拒答）报 `providerError`，不开服务端 fallback，因为 Conversation 的 Model 创建后不换；`model_context_window_exceeded` 按 `length` 处理。
@@ -108,7 +109,7 @@ enum ModelEvent {
 - 思考：按内置表 `GeminiModelTable` 发每个模型支持的最低档（见 §8 第 2 条），不认识的模型什么都不发；`thought: true` 的 Part 不展示。
 - 原样回传：每个 SSE 事件是一个完整的 `GenerateContentResponse`。收到的每个 Part（包括空文本、只带 `thoughtSignature` 的 Part）都通过 `providerData` 交给 TurnRunner，累积在 `opaque(.gemini, [Part…])` 里。complete 的回答逐个原样发回，不合并（带签名的 Part 不能和别的 Part 合并）；interrupted 或 failed 的回答只发文字。
 - Google Search：`groundingMetadata` 以 `{"groundingMetadata": …}` 的形式放进同一串不透明数据，供 App 渲染 `searchEntryPoint.renderedContent`（必须展示），回传时跳过。Citation 由 `groundingSupports` 换算成 UTF-16 范围。
-- 能力：`/v1beta/models` 只用来拿模型列表和 token 上限（只保留能 `generateContent` 的聊天模型）；图片和搜索能力来自内置表。
+- 能力：`/v1beta/models` 只用来拿模型列表和 token 上限（只保留能 `generateContent` 的聊天模型）；图片和搜索能力来自内置表。中转只返回 OpenAI 风格的列表（`{"data": [{"id": …}]}`）时也接受，同样只保留 `gemini-*` 的聊天模型；ID 带厂商前缀（`google/gemini-…`）时去掉前缀再查表，发请求仍用原始 ID（#51）。
 - `finishReason`：`MAX_TOKENS` → length；`SAFETY`、`RECITATION`、`BLOCKLIST`、`PROHIBITED_CONTENT`、`SPII` 等 → providerError；`promptFeedback.blockReason` → providerError。
 - 错误映射：key 无效（400 + `API_KEY_INVALID`）、401、403 → authentication；429（读 `RetryInfo.retryDelay`）→ rateLimited；400 里的 "exceeds the maximum number of tokens" → contextTooLong，其他 400 和 404 → invalidRequest；5xx → overloaded。流中途的 `{"error": …}` 按同样的规则映射。
 

@@ -523,4 +523,111 @@ struct AnthropicAdapterTests {
         #expect(models.first?.capabilities == ModelCapabilities(imageInput: false, toolCalling: true, webSearch: false))
         #expect(transport.requests.last?.url.absoluteString == "https://api.anthropic.com/v1/models?limit=1000&after_id=b")
     }
+
+    // MARK: 经中转和 OpenRouter（#51）
+
+    /// 构造的响应：只返回 OpenAI 风格列表、不带 capabilities 的中转（one-api / new-api 一类）。
+    private let relayModelList = """
+    {"object":"list","data":[\
+    {"id":"claude-sonnet-5-5","object":"model","created":1789000000,"owned_by":"anthropic"},\
+    {"id":"claude-opus-5-5","object":"model","created":1789000000,"owned_by":"anthropic"},\
+    {"id":"claude-opus-4-8","object":"model","created":1789000000,"owned_by":"anthropic"},\
+    {"id":"claude-opus-5-20260301","object":"model","created":1789000000,"owned_by":"anthropic"},\
+    {"id":"claude-sonnet-4-5-20250929","object":"model","created":1789000000,"owned_by":"anthropic"},\
+    {"id":"gpt-5.2","object":"model","created":1789000000,"owned_by":"openai"}]}
+    """
+
+    private let relay = Connection(name: "中转", provider: .anthropic, baseURL: URL(string: "https://relay.example.com")!)
+
+    @Test func relayModelListWithoutCapabilitiesFallsBackToTheBuiltInTable() async throws {
+        let transport = StubTransport(body: relayModelList)
+        let models = try await AnthropicAdapter(transport: transport).listModels(relay, apiKey: "sk-relay")
+
+        // 不是 Claude 的不列出来
+        #expect(models.map(\.id) == [
+            "claude-sonnet-5-5", "claude-opus-5-5", "claude-opus-4-8", "claude-opus-5-20260301", "claude-sonnet-4-5-20250929",
+        ])
+        // Claude 视为支持图片和搜索（地球按钮可用）
+        for claude in models {
+            #expect(claude.capabilities == ModelCapabilities(imageInput: true, toolCalling: true, webSearch: true))
+            #expect(claude.providerData == nil)
+        }
+
+        let sent = try #require(transport.requests.first)
+        #expect(sent.url.absoluteString == "https://relay.example.com/v1/models?limit=1000")
+        #expect(sent.headers["x-api-key"] == "sk-relay")
+        #expect(sent.headers["Authorization"] == nil)
+    }
+
+    @Test(arguments: [
+        // （模型, 期望的 thinking.type，空串表示不发 thinking, 是否发 low effort）
+        ("claude-sonnet-5-5", "between_tools", true),
+        ("claude-opus-5-5", "", true),
+        ("claude-opus-4-8", "disabled", true),
+        // claude-opus-5 的表项不能误配到 claude-opus-5-5，但要能配上带日期的快照
+        ("claude-opus-5-20260301", "disabled", true),
+        // 老模型不发 thinking 就不思考；发 effort 会报错
+        ("claude-sonnet-4-5-20250929", "", false),
+        // 表里没有的：什么都不发
+        ("gpt-5.2", "", false),
+    ])
+    func relayClaudeThinkingFollowsTheBuiltInTable(modelID: String, thinkingType: String, lowEffort: Bool) async throws {
+        let models = try await AnthropicAdapter(transport: StubTransport(body: relayModelList)).listModels(relay, apiKey: "k")
+        var connection = relay
+        connection.models = models
+        let request = ModelRequest(
+            connection: connection, apiKey: "k", modelID: modelID, systemPrompt: "", messages: [.user("Hi")], webSearch: true
+        )
+        let fields = try await sentBody(request)
+        #expect(fields["thinking"] == (thinkingType.isEmpty ? nil : .object(["type": .string(thinkingType)])))
+        #expect(fields["output_config"] == (lowEffort ? .object(["effort": .string("low")]) : nil))
+        let webSearchTool: JSONValue = .object([
+            "type": .string("web_search_20250305"), "name": .string("web_search"), "max_uses": .number(3),
+        ])
+        #expect(fields["tools"] == .array([webSearchTool]))
+    }
+
+    @Test func modelsWithReportedCapabilitiesAreKeptEvenIfNotClaude() async throws {
+        // 构造的响应：接口报告了 capabilities 的就按接口来，不按名字过滤
+        let body = #"{"data":[{"id":"vendor-model","capabilities":{"image_input":{"supported":false}}}],"has_more":false}"#
+        let models = try await AnthropicAdapter(transport: StubTransport(body: body)).listModels(.anthropic(), apiKey: "k")
+        #expect(models.map(\.id) == ["vendor-model"])
+    }
+
+    @Test func capabilitiesReportedByTheAPIWinOverTheBuiltInTable() async throws {
+        // 表里 Opus 5.5 关不掉思考；接口说能关就按接口来
+        let fields = try await sentBody(request(models: [model("claude-opus-5-5", thinkingCanBeDisabled: true)], modelID: "claude-opus-5-5"))
+        #expect(fields["thinking"] == .object(["type": .string("disabled")]))
+    }
+
+    @Test func openRouterUsesBearerAuthAndVendorPrefixedModelIDs() async throws {
+        // OpenRouter 的 Messages 端点：base URL 填 https://openrouter.ai/api，只认 Bearer（research §1.8）。
+        // 构造的响应：OpenRouter `/api/v1/models` 的格式（data[].id 带厂商前缀、版本用点号），只留了 id 和 name
+        let list = #"{"data":[{"id":"anthropic/claude-opus-4.8","name":"Anthropic: Claude Opus 4.8"},{"id":"deepseek/deepseek-v4-flash","name":"DeepSeek: DeepSeek V4 Flash"}]}"#
+        var openRouter = Connection(name: "OpenRouter", provider: .anthropic, baseURL: URL(string: "https://openrouter.ai/api")!)
+        let transport = StubTransport(body: list)
+        openRouter.models = try await AnthropicAdapter(transport: transport).listModels(openRouter, apiKey: "sk-or")
+
+        let listRequest = try #require(transport.requests.first)
+        #expect(listRequest.url.absoluteString == "https://openrouter.ai/api/v1/models?limit=1000")
+        #expect(listRequest.headers["Authorization"] == "Bearer sk-or")
+        #expect(listRequest.headers["x-api-key"] == nil)
+        // OpenRouter 的列表里有各家的模型，只留下 Claude
+        #expect(openRouter.models.map(\.id) == ["anthropic/claude-opus-4.8"])
+        #expect(openRouter.models.first?.capabilities.webSearch == true)
+
+        let messages = StubTransport(body: textBlock + messageDelta("end_turn") + messageStop)
+        let request = ModelRequest(
+            connection: openRouter, apiKey: "sk-or", modelID: "anthropic/claude-opus-4.8", systemPrompt: "", messages: [.user("Hi")], webSearch: false
+        )
+        _ = try await collect(messages, request)
+        let sent = try #require(messages.requests.first)
+        #expect(sent.url.absoluteString == "https://openrouter.ai/api/v1/messages")
+        #expect(sent.headers["Authorization"] == "Bearer sk-or")
+        #expect(sent.headers["x-api-key"] == nil)
+        let body = try JSONDecoder().decode(JSONValue.self, from: try #require(sent.body))
+        // 模型 ID 原样发出，查表时才统一写法
+        #expect(body["model"] == .string("anthropic/claude-opus-4.8"))
+        #expect(body["thinking"] == .object(["type": .string("disabled")]))
+    }
 }

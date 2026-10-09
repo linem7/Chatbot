@@ -29,11 +29,19 @@ enum GeminiModelTable {
 
     /// 不认识的模型返回 nil：什么都不发，用模型的默认值，避免发了不支持的档位报错。
     static func lowestThinking(for modelID: String) -> Thinking? {
-        thinking.first { modelID.hasPrefix($0.prefix) }?.setting
+        let modelID = baseName(modelID)
+        return thinking.first { modelID.hasPrefix($0.prefix) }?.setting
+    }
+
+    /// 查表用的模型名：中转可能给 ID 加上厂商前缀（`google/gemini-2.5-flash`），去掉前缀再查。
+    /// 只去前缀，不像 Anthropic 那样换点号：Gemini 的官方 ID 本来就用点号写版本。发请求时仍用原始 ID。
+    static func baseName(_ modelID: String) -> String {
+        (modelID.split(separator: "/").last.map(String.init) ?? modelID).lowercased()
     }
 
     /// 支持 google_search 的模型（文档的支持表：2.0 Flash、2.5 全系、3.x 全系）。
     static func supportsWebSearch(_ modelID: String) -> Bool {
+        let modelID = baseName(modelID)
         // 支持表里有 2.0 Flash，没有 2.0 Flash-Lite，前缀相同，要单独排除
         if modelID.hasPrefix("gemini-2.0-flash-lite") { return false }
         return ["gemini-2.0-flash", "gemini-2.5-", "gemini-3"].contains { modelID.hasPrefix($0) }
@@ -41,12 +49,13 @@ enum GeminiModelTable {
 
     /// 现役的 Gemini 聊天模型都能看图。
     static func acceptsImages(_ modelID: String) -> Bool {
-        modelID.hasPrefix("gemini-")
+        baseName(modelID).hasPrefix("gemini-")
     }
 
     /// 不是聊天用的模型（嵌入、语音、生图、实时等），不出现在 Model 列表里。
     /// `-latest` 是指向其他模型的别名，能力和思考档位对不上内置表，也不列出来。
     static func isChatModel(_ modelID: String) -> Bool {
+        let modelID = baseName(modelID)
         let excluded = ["embedding", "tts", "image", "audio", "live", "robotics", "aqa", "imagen", "veo", "-latest"]
         return modelID.hasPrefix("gemini-") && !excluded.contains { modelID.contains($0) }
     }

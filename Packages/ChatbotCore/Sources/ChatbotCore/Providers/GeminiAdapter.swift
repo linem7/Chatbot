@@ -46,6 +46,8 @@ public struct GeminiAdapter: ProviderAdapter {
                     throw ChatError.providerError("无法解析 Model 列表")
                 }
                 models += (page.models ?? []).compactMap(\.modelInfo)
+                // 中转常常只返回 OpenAI 风格的列表（`{"data": [{"id": …}]}`），能力同样来自内置表
+                models += (page.data ?? []).compactMap { ModelPage.Entry(name: $0.id).modelInfo }
                 guard let next = page.nextPageToken, !next.isEmpty, next != pageToken else { break }
                 pageToken = next
             }
@@ -379,6 +381,11 @@ private struct ModelPage: Decodable {
         }
     }
 
+    struct OpenAIStyleEntry: Decodable {
+        var id: String
+    }
+
     var models: [Entry]?
     var nextPageToken: String?
+    var data: [OpenAIStyleEntry]?
 }

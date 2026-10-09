@@ -2,10 +2,13 @@ import Foundation
 
 /// Anthropic Messages API 的 adapter（ARCHITECTURE §3.2）。没有官方 Swift SDK，直接用 HTTP。
 ///
-/// - 端点是 `POST {base}/v1/messages`，Model 列表是 `GET {base}/v1/models`（分页）。
+/// - 端点是 `POST {base}/v1/messages`，Model 列表是 `GET {base}/v1/models`（分页）。中转和 OpenRouter 也用这两个路径，
+///   base URL 填到 `/v1` 之前（OpenRouter 是 `https://openrouter.ai/api`）。
+/// - 鉴权：key 放在 `x-api-key` 头里；OpenRouter 只认 `Authorization: Bearer`。
 /// - 思考（ADR-0002）：能关就关。Model 支持就发 `thinking: disabled`；Sonnet 5.5 发 `between_tools`；
 ///   关不掉的（Opus 5.5、Fable）走 adaptive，回传思考块时声明 drop_block。
-///   支持时都发 `output_config.effort: "low"`，把思考和延迟压到最低。是否支持都看 `/v1/models` 的 capabilities。
+///   支持时都发 `output_config.effort: "low"`，把思考和延迟压到最低。是否支持看 `/v1/models` 的 capabilities；
+///   接口没报告（中转多半如此）时按模型名查 `AnthropicModelTable`。
 /// - Web Search 用 `web_search_20250305`，`max_uses: 3`（ADR-0003）。
 /// - 流里每个完整的内容块（thinking、server_tool_use、web_search_tool_result、带 citations 的 text）
 ///   都通过 `providerData` 原样交出去，由 TurnRunner 保存；继续对话时逐字发回（ADR-0001）。
@@ -51,14 +54,14 @@ public struct AnthropicAdapter: ProviderAdapter {
                 var components = URLComponents(url: connection.baseURL.appendingPathComponent("v1/models"), resolvingAgainstBaseURL: false)!
                 components.queryItems = [URLQueryItem(name: "limit", value: "1000")]
                 if let afterID { components.queryItems?.append(URLQueryItem(name: "after_id", value: afterID)) }
-                let response = try await transport.send(HTTPRequest(method: "GET", url: components.url!, headers: Self.headers(apiKey)))
+                let response = try await transport.send(HTTPRequest(method: "GET", url: components.url!, headers: Self.headers(apiKey, connection: connection)))
                 try await Self.throwIfNotSuccess(response)
                 let data = try await response.collectBody(limit: 4 * 1024 * 1024)
                 guard let page = try? JSONDecoder().decode(ModelPage.self, from: data) else {
                     throw ChatError.providerError("无法解析 Model 列表")
                 }
                 let fresh = page.data.filter { seen.insert($0.id).inserted }
-                models += fresh.map(\.modelInfo)
+                models += fresh.compactMap(\.modelInfo)
                 guard page.hasMore == true, let lastID = page.lastID, !fresh.isEmpty else { break }
                 afterID = lastID
             }
@@ -114,6 +117,7 @@ public struct AnthropicAdapter: ProviderAdapter {
         // ADR-0002：能关就关。Sonnet 5.5 发 disabled 会 400，要用 between_tools 关；都关不掉的走 adaptive。
         // capabilities 里有没有 between_tools 这一项还没有官方示例，按有就用、没有就当不支持处理
         let thinkingTypes = capabilities?["thinking"]?["types"]
+        let tableEntry = capabilities == nil ? AnthropicModelTable.entry(for: request.modelID) : nil
         let thinkingMode: ThinkingMode
         if thinkingTypes?["disabled"]?["supported"]?.boolValue == true {
             thinkingMode = .disabled
@@ -122,8 +126,13 @@ public struct AnthropicAdapter: ProviderAdapter {
         } else if capabilities != nil {
             thinkingMode = .adaptive
         } else {
-            // 能力未知：什么都不发，避免 400
-            thinkingMode = .unknown
+            // 接口没报告能力：按内置表；表里也没有就什么都不发，避免 400
+            switch tableEntry?.thinking {
+            case .disabled: thinkingMode = .disabled
+            case .betweenTools: thinkingMode = .betweenTools
+            case .adaptive: thinkingMode = .adaptive
+            case .offByDefault, nil: thinkingMode = .unknown
+            }
         }
 
         let messages = messages(for: request, stripThinkingFromEarlierTurns: thinkingMode == .betweenTools)
@@ -133,7 +142,7 @@ public struct AnthropicAdapter: ProviderAdapter {
             "stream": .bool(true),
             "messages": .array(messages),
         ]
-        var headers = headers(request.apiKey).merging(["content-type": "application/json", "accept": "text/event-stream"]) { _, new in new }
+        var headers = headers(request.apiKey, connection: request.connection).merging(["content-type": "application/json", "accept": "text/event-stream"]) { _, new in new }
         if !request.systemPrompt.isEmpty {
             body["system"] = .string(request.systemPrompt)
         }
@@ -155,7 +164,7 @@ public struct AnthropicAdapter: ProviderAdapter {
         case .adaptive, .unknown:
             break
         }
-        if capabilities?["effort"]?["low"]?["supported"]?.boolValue == true {
+        if capabilities?["effort"]?["low"]?["supported"]?.boolValue ?? tableEntry?.lowEffort == true {
             body["output_config"] = .object(["effort": .string("low")])
         }
         if request.webSearch {
@@ -179,6 +188,7 @@ public struct AnthropicAdapter: ProviderAdapter {
         case betweenTools
         /// 关不掉（Opus 5.5、Fable）：默认 adaptive，回传思考块时声明 drop_block
         case adaptive
+        /// 能力未知，或者不发 thinking 就不思考的老模型：什么都不发
         case unknown
     }
 
@@ -195,8 +205,16 @@ public struct AnthropicAdapter: ProviderAdapter {
         }
     }
 
-    private static func headers(_ apiKey: String) -> [String: String] {
-        ["x-api-key": apiKey, "anthropic-version": apiVersion]
+    /// OpenRouter 的 Messages 端点只认 Bearer（`docs/research/third-party-web-search.md` §1.8）；
+    /// 其他中转按 Anthropic 官方的写法发 `x-api-key`。不两个都发：有的中转会拒绝。
+    private static func headers(_ apiKey: String, connection: Connection) -> [String: String] {
+        var headers = ["anthropic-version": apiVersion]
+        if case .openRouter = connection.platform {
+            headers["Authorization"] = "Bearer \(apiKey)"
+        } else {
+            headers["x-api-key"] = apiKey
+        }
+        return headers
     }
 
     /// - Parameter stripThinkingFromEarlierTurns: between_tools 不接受 block_binding，所以之前完成的回答里的
@@ -446,11 +464,19 @@ private struct ModelPage: Decodable {
 
         /// 图片看 `image_input`，搜索看 `server_tools.web_search`，tools 视为支持（ARCHITECTURE §3.2）。
         /// 能力原文存进 providerData，adapter 判断思考和 effort 时要用。
-        var modelInfo: ModelInfo {
+        /// 中转和 OpenRouter 常常只返回 OpenAI 风格的列表（只有 `id`），这时 Claude 按内置表视为支持图片和搜索，
+        /// 别家的模型不列出来（OpenRouter 会返回几百个各家的模型；和 Gemini 只保留 `gemini-*` 对称）。
+        var modelInfo: ModelInfo? {
             var result = ModelCapabilities.conservative
-            if let capabilities, capabilities != .null {
+            let capabilities = capabilities == .null ? nil : capabilities
+            if let capabilities {
                 result.imageInput = capabilities["image_input"]?["supported"]?.boolValue ?? false
                 result.webSearch = capabilities["server_tools"]?["web_search"]?["supported"]?.boolValue ?? false
+            } else if AnthropicModelTable.isClaude(id) {
+                result.imageInput = true
+                result.webSearch = true
+            } else {
+                return nil
             }
             return ModelInfo(
                 id: id,
