@@ -10,7 +10,7 @@ struct TitleGeneratorTests {
         let conversation = Conversation(connectionID: connection.id, modelID: "deepseek-flash")
         let question = Message.user("Swift 里 actor 和 class 有什么区别？")
         let answer = Message(role: .assistant, content: [ContentBlock(.text("actor 会隔离可变状态……"))])
-        await store.saveUserMessage(question, in: conversation)
+        try await store.saveUserMessage(question, in: conversation)
         await store.saveAssistantMessage(answer, conversationID: conversation.id)
         return (conversation, question, answer)
     }

@@ -11,8 +11,12 @@ final class CancellationCheckingStore: MessageStore {
         saved.withLock { $0 }
     }
 
-    func saveUserMessage(_ message: Message, in conversation: Conversation) async throws {
+    func saveUserMessage(_ message: Message, attachments: [Attachment], in conversation: Conversation) async throws {
         try save(message)
+    }
+
+    func attachments(in conversationID: UUID) async throws -> [Attachment] {
+        []
     }
 
     func saveAssistantMessage(_ message: Message, conversationID: UUID) async throws {

@@ -5,24 +5,43 @@ import Foundation
 /// 约定：Turn 被取消之后，TurnRunner 仍然会调用这里保存用户 Message 和 interrupted 的回答。
 /// TurnRunner 会在一个没有被取消的 Task 里调用，实现可以照常检查取消（例如 GRDB 的 `write`）。
 public protocol MessageStore: Sendable {
-    /// Turn 开始时保存用户 Message。Conversation 还没保存过时一起创建（第一次 Turn）。
+    /// Turn 开始时保存用户 Message 和它的附件副本。Conversation 还没保存过时一起创建（第一次 Turn）。
     /// 必须是 upsert：Retry 会用同一条用户 Message（同一个 id）再执行一次 Turn，
-    /// 这时不能新增一条，原来的位置也不变。
-    func saveUserMessage(_ message: Message, in conversation: Conversation) async throws
+    /// 这时不能新增一条，原来的位置也不变，附件也不重复保存。
+    func saveUserMessage(_ message: Message, attachments: [Attachment], in conversation: Conversation) async throws
     /// Turn 结束（complete / interrupted / failed）时保存 assistant Message。同一个 id 只会保存一次。
     func saveAssistantMessage(_ message: Message, conversationID: UUID) async throws
+    /// 一个 Conversation 里所有用户 Message 的附件，按保存顺序。继续对话时要把它们再发给模型。
+    func attachments(in conversationID: UUID) async throws -> [Attachment]
+}
+
+extension MessageStore {
+    /// 没有附件的用户 Message。
+    public func saveUserMessage(_ message: Message, in conversation: Conversation) async throws {
+        try await saveUserMessage(message, attachments: [], in: conversation)
+    }
 }
 
 /// 只存在内存里的 MessageStore。
 public actor InMemoryMessageStore: MessageStore, TitleStore {
     private var conversationsByID: [UUID: Conversation] = [:]
     private var messagesByConversation: [UUID: [Message]] = [:]
+    private var attachmentsByConversation: [UUID: [Attachment]] = [:]
 
     public init() {}
 
-    public func saveUserMessage(_ message: Message, in conversation: Conversation) {
+    public func saveUserMessage(_ message: Message, attachments: [Attachment], in conversation: Conversation) {
         if conversationsByID[conversation.id] == nil { conversationsByID[conversation.id] = conversation }
         upsert(message, conversationID: conversation.id)
+        var saved = attachmentsByConversation[conversation.id, default: []]
+        for attachment in attachments where !saved.contains(where: { $0.id == attachment.id }) {
+            saved.append(attachment)
+        }
+        attachmentsByConversation[conversation.id] = saved
+    }
+
+    public func attachments(in conversationID: UUID) -> [Attachment] {
+        attachmentsByConversation[conversationID, default: []]
     }
 
     public func saveAssistantMessage(_ message: Message, conversationID: UUID) {

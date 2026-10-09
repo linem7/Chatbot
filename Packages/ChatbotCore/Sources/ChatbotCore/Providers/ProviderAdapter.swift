@@ -18,6 +18,8 @@ public struct ModelRequest: Sendable {
     public var messages: [Message]
     /// 当前 Model 支持搜索，并且这个 Conversation 没有关掉搜索。
     public var webSearch: Bool
+    /// messages 里 `attachmentRef` 引用的附件内容。
+    public var attachments: [UUID: Attachment]
 
     public init(
         connection: Connection,
@@ -25,7 +27,8 @@ public struct ModelRequest: Sendable {
         modelID: String,
         systemPrompt: String,
         messages: [Message],
-        webSearch: Bool
+        webSearch: Bool,
+        attachments: [UUID: Attachment] = [:]
     ) {
         self.connection = connection
         self.apiKey = apiKey
@@ -33,6 +36,12 @@ public struct ModelRequest: Sendable {
         self.systemPrompt = systemPrompt
         self.messages = messages
         self.webSearch = webSearch
+        self.attachments = attachments
+    }
+
+    /// 这次调用的 Model 的能力；Connection 里没有缓存这个 Model 时用保守默认。
+    public var capabilities: ModelCapabilities {
+        connection.models.first { $0.id == modelID }?.capabilities ?? .conservative
     }
 }
 

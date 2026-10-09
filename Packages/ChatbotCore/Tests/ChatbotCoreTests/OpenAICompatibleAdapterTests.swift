@@ -190,6 +190,74 @@ struct OpenAICompatibleAdapterTests {
         #expect(fields["thinking"] == nil)
     }
 
+    // MARK: 附件
+
+    private func sentMessages(_ request: ModelRequest) async throws -> JSONValue? {
+        let transport = StubTransport(body: chunk(nil, finishReason: "stop"))
+        _ = try await collect(transport, request)
+        let body = try JSONDecoder().decode(JSONValue.self, from: try #require(transport.requests.first?.body))
+        guard case .object(let fields) = body else { return nil }
+        return fields["messages"]
+    }
+
+    private func requestWithAttachments(imageInput: Bool) -> ModelRequest {
+        let image = Attachment(kind: .image, originalName: "截图.png", content: .image(Data([1, 2, 3]), mediaType: "image/png"))
+        let code = Attachment(kind: .text, originalName: "main.swift", content: .text("print(1)"))
+        var connection = Connection.deepSeek()
+        connection.models = [ModelInfo(
+            id: "deepseek-flash",
+            capabilities: ModelCapabilities(imageInput: imageInput, toolCalling: true, webSearch: false)
+        )]
+        var request = request(connection: connection, messages: [.user("看看这个", attachments: [image, code])])
+        request.attachments = [image.id: image, code.id: code]
+        return request
+    }
+
+    @Test func imagesAreSentAsDataURLsWhenTheModelAcceptsThem() async throws {
+        let messages = try await sentMessages(requestWithAttachments(imageInput: true))
+        #expect(messages == .array([
+            .object(["role": .string("user"), "content": .array([
+                .object(["type": .string("image_url"), "image_url": .object(["url": .string("data:image/png;base64,AQID")])]),
+                .object(["type": .string("text"), "text": .string("附件 main.swift：\nprint(1)")]),
+                .object(["type": .string("text"), "text": .string("看看这个")]),
+            ])]),
+        ]))
+    }
+
+    @Test func imagesAreReplacedByANoteWhenTheModelCannotTakeThem() async throws {
+        // SPEC §4：当前 Model 不支持图片时忽略图片（界面另有提示）；留一段占位文字，模型知道这里本来有图
+        let messages = try await sentMessages(requestWithAttachments(imageInput: false))
+        #expect(messages == .array([
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]\n\n附件 main.swift：\nprint(1)\n\n看看这个")]),
+        ]))
+    }
+
+    @Test func modelsWithUnknownCapabilitiesGetNoImages() async throws {
+        var request = requestWithAttachments(imageInput: true)
+        request.connection.models = []
+        let messages = try await sentMessages(request)
+        #expect(messages == .array([
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]\n\n附件 main.swift：\nprint(1)\n\n看看这个")]),
+        ]))
+    }
+
+    @Test func imageOnlyMessagesKeepUserAndAssistantAlternating() async throws {
+        // 只有图片的用户 Message 不能整条消失，否则会出现连续两条 assistant
+        let image = Attachment(kind: .image, originalName: "截图.png", content: .image(Data([1]), mediaType: "image/png"))
+        var request = request(messages: [
+            .user("", attachments: [image]),
+            Message(role: .assistant, content: [ContentBlock(.text("我看不到图片"))]),
+            .user("那算了"),
+        ])
+        request.attachments = [image.id: image]
+        let messages = try await sentMessages(request)
+        #expect(messages == .array([
+            .object(["role": .string("user"), "content": .string("[图片已省略：当前模型不支持图片]")]),
+            .object(["role": .string("assistant"), "content": .string("我看不到图片")]),
+            .object(["role": .string("user"), "content": .string("那算了")]),
+        ]))
+    }
+
     // MARK: HTTP 错误映射（ARCHITECTURE §3.4，SPEC §7）
 
     /// 错误体是构造的：DeepSeek 文档只有状态码表，没有错误体示例，这里按 OpenAI 的 `{"error": {...}}` 形状写。

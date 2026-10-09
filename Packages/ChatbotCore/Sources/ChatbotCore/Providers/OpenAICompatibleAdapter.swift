@@ -106,13 +106,20 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
     static func httpRequest(for request: ModelRequest) throws -> HTTPRequest {
         var messages: [ChatMessage] = []
         if !request.systemPrompt.isEmpty {
-            messages.append(ChatMessage(role: "system", content: request.systemPrompt))
+            messages.append(ChatMessage(role: "system", content: .text(request.systemPrompt)))
         }
+        let acceptsImages = request.capabilities.imageInput
         for message in request.messages {
-            // 附件的编码在 #21 里做；这里只发文字
-            let text = message.markdownText
-            if text.isEmpty { continue }
-            messages.append(ChatMessage(role: message.role.rawValue, content: text))
+            switch message.role {
+            case .assistant:
+                let text = message.markdownText
+                if text.isEmpty { continue }
+                messages.append(ChatMessage(role: "assistant", content: .text(text)))
+            case .user:
+                let parts = userParts(message, attachments: request.attachments, acceptsImages: acceptsImages)
+                if parts.isEmpty { continue }
+                messages.append(ChatMessage(role: "user", content: .init(parts)))
+            }
         }
         let body = ChatRequestBody(
             model: request.modelID,
@@ -130,6 +137,31 @@ public struct OpenAICompatibleAdapter: ProviderAdapter {
             ],
             body: try JSONEncoder().encode(body)
         )
+    }
+
+    static let omittedImageNote = "[图片已省略：当前模型不支持图片]"
+
+    /// 用户 Message 按内容块的顺序编码。图片用 base64 data URL；Model 不接受图片时换成占位文字（SPEC §4，
+    /// 界面另有提示）。文本和 PDF 附件作为文字块，前面加上文件名（ARCHITECTURE §6）。
+    private static func userParts(_ message: Message, attachments: [UUID: Attachment], acceptsImages: Bool) -> [ContentPart] {
+        message.content.compactMap { block in
+            switch block.kind {
+            case .text(let text, _):
+                return text.isEmpty ? nil : .text(text)
+            case .attachmentRef(let id):
+                // 附件副本找不到（例如被手动删了）时略过
+                guard let attachment = attachments[id] else { return nil }
+                switch attachment.content {
+                case .image(let data, let mediaType):
+                    // 不接受图片时留一段占位文字：模型知道这里本来有图，只有图片的 Message 也不会整条消失
+                    return acceptsImages ? .imageURL("data:\(mediaType);base64,\(data.base64EncodedString())") : .text(Self.omittedImageNote)
+                case .text(let text):
+                    return .text("附件 \(attachment.originalName)：\n\(text)")
+                }
+            default:
+                return nil
+            }
+        }
     }
 
     // MARK: 错误映射（ARCHITECTURE §3.4）
@@ -193,7 +225,53 @@ private struct ChatRequestBody: Encodable {
 
 private struct ChatMessage: Encodable {
     var role: String
-    var content: String
+    var content: Content
+
+    /// 只有文字时发字符串，有图片时发 content parts 数组。
+    enum Content: Encodable {
+        case text(String)
+        case parts([ContentPart])
+
+        init(_ parts: [ContentPart]) {
+            let texts = parts.compactMap { part -> String? in
+                if case .text(let text) = part { return text }
+                return nil
+            }
+            self = texts.count == parts.count ? .text(texts.joined(separator: "\n\n")) : .parts(parts)
+        }
+
+        func encode(to encoder: any Encoder) throws {
+            var container = encoder.singleValueContainer()
+            switch self {
+            case .text(let text): try container.encode(text)
+            case .parts(let parts): try container.encode(parts)
+            }
+        }
+    }
+}
+
+private enum ContentPart: Encodable {
+    case text(String)
+    case imageURL(String)
+
+    private enum CodingKeys: String, CodingKey {
+        case type, text
+        case imageURL = "image_url"
+    }
+
+    private struct ImageURL: Encodable { var url: String }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .text(let text):
+            try container.encode("text", forKey: .type)
+            try container.encode(text, forKey: .text)
+        case .imageURL(let url):
+            try container.encode("image_url", forKey: .type)
+            try container.encode(ImageURL(url: url), forKey: .imageURL)
+        }
+    }
 }
 
 private struct StreamChunk: Decodable {

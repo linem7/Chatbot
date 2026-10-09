@@ -10,6 +10,8 @@ public struct TurnInput: Sendable {
     /// userMessage 之前的消息，不含 userMessage。
     public var history: [Message]
     public var userMessage: Message
+    /// userMessage 引用的附件（AttachmentIntake 处理好的）。之前的消息的附件由 store 读出来。
+    public var attachments: [Attachment]
 
     public init(
         conversation: Conversation,
@@ -17,7 +19,8 @@ public struct TurnInput: Sendable {
         apiKey: String,
         systemPrompt: String,
         history: [Message],
-        userMessage: Message
+        userMessage: Message,
+        attachments: [Attachment] = []
     ) {
         self.conversation = conversation
         self.connection = connection
@@ -25,6 +28,7 @@ public struct TurnInput: Sendable {
         self.systemPrompt = systemPrompt
         self.history = history
         self.userMessage = userMessage
+        self.attachments = attachments
     }
 }
 
@@ -98,7 +102,12 @@ public struct TurnRunner: Sendable {
         do {
             let store = self.store
             try await Self.ignoringCancellation {
-                try await store.saveUserMessage(input.userMessage, in: input.conversation)
+                try await store.saveUserMessage(input.userMessage, attachments: input.attachments, in: input.conversation)
+            }
+            // 继续对话时，之前消息里的附件也要再发给模型
+            var attachments: [UUID: Attachment] = [:]
+            for attachment in try await store.attachments(in: input.conversation.id) + input.attachments {
+                attachments[attachment.id] = attachment
             }
 
             var continuations = 0
@@ -112,7 +121,8 @@ public struct TurnRunner: Sendable {
                     modelID: input.conversation.modelID,
                     systemPrompt: input.systemPrompt,
                     messages: messages,
-                    webSearch: webSearch
+                    webSearch: webSearch,
+                    attachments: attachments
                 )
 
                 var finishReason: FinishReason?
