@@ -1,8 +1,15 @@
 # Web Search 只用 Provider 的原生能力，DeepSeek 不联网
 
+> 2026-10-09 修订（#48、#54）：除了 Provider 的原生搜索，也使用 **Platform 自带的搜索**。OpenAI 兼容 Connection 如果在 OpenRouter 或阿里云百炼上，就能联网：
+> - **OpenRouter** 在 `tools` 里加 `{"type": "openrouter:web_search"}`，由模型决定搜不搜，引用从流里的 `annotations`（`url_citation`）取，正文里照常显示角标和来源列表。EU 端点（`eu.openrouter.ai`）上没有搜索引擎，不联网。
+> - **阿里云百炼**发 `enable_search: true`。它的 OpenAI 兼容接口不返回来源，所以没有角标、来源列表和「正在搜索」。
+> - 这两个平台上的所有 Model 都视为支持 Web Search（平台的搜索对任何模型都能用，`/models` 看不出来）。其他 OpenAI 兼容 Connection（DeepSeek 官方、OpenAI 官方、普通中转）仍然不联网。
+>
+> 这仍然是「服务端执行的搜索」，app 不调用任何外部搜索服务，和下面的原则一致：搜索由 Provider 或 Platform 在服务端执行。调研见 `docs/research/third-party-web-search.md`。
+
 用户不想接外部搜索服务，所以 Web Search 只使用 Provider 在服务端提供的原生搜索：Anthropic 的 `web_search` 工具，以及 Gemini 的 `google_search`。OpenAI 兼容 Provider 在 v1 不支持搜索。原因有两个：DeepSeek API 根本没有原生搜索（截至 2026-10 只支持 `function` 类型的工具）；OpenAI 官方只有专用的搜索模型，而且每次请求都会先搜一遍。
 
-这意味着**用户主要使用的 DeepSeek 没有联网能力**。「是否支持 Web Search」是 Model Capabilities 的一项，Model 不支持时，面板上的搜索开关会置灰。
+这意味着**用户主要使用的 DeepSeek 没有联网能力**（直连 DeepSeek 官方时如此；经 OpenRouter 或百炼使用 DeepSeek 时，按上面的修订可以联网）。「是否支持 Web Search」是 Model Capabilities 的一项，Model 不支持时，面板上的搜索开关会置灰。
 
 ## Considered Options
 

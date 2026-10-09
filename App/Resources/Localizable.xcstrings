@@ -102,6 +102,16 @@
         }
       }
     },
+    "Alibaba Cloud Model Studio": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阿里云百炼"
+          }
+        }
+      }
+    },
     "All conversations and their attachments will be deleted. This can't be undone.": {
       "localizations": {
         "zh-Hans": {
@@ -348,6 +358,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "请填写有效的 base URL，以 https:// 开头。"
+          }
+        }
+      }
+    },
+    "For the Singapore region, change the host to dashscope-intl.aliyuncs.com.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新加坡地域请改成 dashscope-intl.aliyuncs.com。"
           }
         }
       }

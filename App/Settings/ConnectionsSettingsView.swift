@@ -202,6 +202,12 @@ private struct ConnectionEditor: View {
                     LabeledContent("Provider") { Text(verbatim: draft.provider.displayName) }
                 }
                 TextField("Base URL", text: $draft.baseURL, prompt: Text(verbatim: "https://"))
+                if Platform(host: URL(string: draft.baseURL)?.host()) == .bailian {
+                    // 百炼按地域分端点，模板默认北京（#54）
+                    Text("For the Singapore region, change the host to dashscope-intl.aliyuncs.com.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 SecureField(
                     "API Key",
                     text: $draft.apiKey,
@@ -236,14 +242,16 @@ private struct ConnectionEditor: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(draft.models) { model in
+                    // 能力按 Connection 算：OpenRouter、百炼上的 Model 都能联网，老 Connection 不用重新拉取（ADR-0003）
+                    let capabilities = draft.makeConnection()?.capabilities(ofModel: model.id) ?? model.capabilities
                     HStack {
                         Toggle(isOn: visibility(of: model.id)) {
                             HStack(spacing: 6) {
                                 Text(verbatim: model.displayName ?? model.id)
-                                if model.capabilities.imageInput {
+                                if capabilities.imageInput {
                                     Image(systemName: "photo").foregroundStyle(.secondary).help("Accepts images")
                                 }
-                                if model.capabilities.webSearch {
+                                if capabilities.webSearch {
                                     Image(systemName: "globe").foregroundStyle(.secondary).help("Can search the web")
                                 }
                             }

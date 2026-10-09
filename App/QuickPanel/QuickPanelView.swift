@@ -108,7 +108,10 @@ private struct ModelPicker: View {
                             store.selectModel(ModelRef(connectionID: connection.id, modelID: model.id))
                         } label: {
                             Text(verbatim: model.displayName ?? model.id)
-                            if model.capabilities.imageInput { Image(systemName: "photo") }
+                            // 能力按 Connection 算：OpenRouter、百炼上的 Model 都能联网（ADR-0003）
+                            let capabilities = connection.capabilities(ofModel: model.id)
+                            if capabilities.imageInput { Image(systemName: "photo") }
+                            if capabilities.webSearch { Image(systemName: "globe") }
                         }
                     }
                 }

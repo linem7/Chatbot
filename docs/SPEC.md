@@ -95,18 +95,22 @@
 
 ## 5. Web Search（联网搜索）
 
-- **只用 Provider 的原生搜索**，不接外部搜索服务（ADR-0003）：
+- **只用 Provider 或 Platform 在服务端执行的搜索**，不接外部搜索服务（ADR-0003）：
   - Anthropic 的 `web_search` 工具；
   - Gemini 的 `google_search`；
-  - OpenAI 兼容 Provider（**包括 DeepSeek**）在 v1 不支持搜索。
+  - **OpenRouter** 的 `openrouter:web_search`（OpenAI 兼容 Connection，base URL 在 `openrouter.ai`；EU 端点除外）；
+  - **阿里云百炼**的 `enable_search`（OpenAI 兼容 Connection，base URL 在 `dashscope*.aliyuncs.com` 或 `*.maas.aliyuncs.com`）；
+  - 其他 OpenAI 兼容 Connection（**直连 DeepSeek 官方**、OpenAI 官方、普通中转）不支持搜索。
+- Platform 按 base URL 的 host 自动识别，已有的 Connection 不用重建。这两个 Platform 上的所有 Model 都视为支持搜索。
 - 「是否支持 Web Search」是 Model Capabilities 的一项。
 - **默认开启**，由模型自己决定搜不搜。
 - 地球按钮可以对**当前 Conversation** 关闭搜索。Model 不支持搜索时，按钮置灰，悬停提示「当前模型不支持联网」。
 - 每次 Turn 最多搜索 3 次。这个上限只对 Anthropic 有效，Gemini 无法限制。
 - 显示方式：
-  - 搜索中显示「正在搜索：关键词」，正文开始输出后，变成一行灰字「搜索了：A、B」。
+  - 搜索中显示「正在搜索：关键词」，正文开始输出后，变成一行灰字「搜索了：A、B」。OpenRouter 和百炼的流里没有可靠的搜索事件，不显示这一行。
   - **Citation** 在正文中显示为角标 [1][2]；回答末尾列出「标题 + 域名」，点击后用默认浏览器打开。
   - 用 Gemini 时，按其条款要求，在回答下方原样展示 Google 的「搜索建议」组件。
+  - 百炼的 OpenAI 兼容接口不返回来源，所以用百炼时没有角标和来源列表，只有回答本身。
 
 ## 6. 回答的显示
 
@@ -158,7 +162,7 @@
 
 **Connection**
 - 增加、编辑、删除 Connection。
-- 添加时先选模板：DeepSeek / Anthropic / Gemini / OpenAI / 自定义。模板会自动填好 Provider 和 base URL，用户只需要粘贴 API key。自定义模板可以选 Provider，自己填 base URL。
+- 添加时先选模板：DeepSeek / Anthropic / Gemini / OpenAI / OpenRouter / 阿里云百炼 / 自定义。百炼模板默认北京地域，base URL 下面提示新加坡地域要改成 `dashscope-intl.aliyuncs.com`。模板会自动填好 Provider 和 base URL，用户只需要粘贴 API key。自定义模板可以选 Provider，自己填 base URL。
 - 保存时自动拉取 Model 列表，这一步同时就是连接测试。失败时按 §7 的错误类别显示原因。
 - 可以隐藏不用的 Model。拉取失败时可以手动填写模型 ID。
 - **不能手动修改 Model Capabilities**。

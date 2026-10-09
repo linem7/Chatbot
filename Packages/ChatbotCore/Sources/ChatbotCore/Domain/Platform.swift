@@ -56,4 +56,16 @@ extension Connection {
     public var platform: Platform? {
         Platform(host: baseURL.host)
     }
+
+    /// 某个 Model 的能力。缓存的 Model 列表里没有它时用保守默认。
+    ///
+    /// OpenAI 兼容 Connection 在能联网的平台上（OpenRouter、百炼），所有 Model 都视为支持 Web Search（ADR-0003）：
+    /// 平台的搜索对任何模型都能用，`/models` 也看不出来，所以不依赖缓存的能力，#54 之前保存的 Connection 不用重新拉取。
+    public func capabilities(ofModel modelID: String) -> ModelCapabilities {
+        var capabilities = models.first { $0.id == modelID }?.capabilities ?? .conservative
+        if provider == .openAICompatible, platform?.supportsServerWebSearch == true {
+            capabilities.webSearch = true
+        }
+        return capabilities
+    }
 }

@@ -39,9 +39,9 @@ public struct ModelRequest: Sendable {
         self.attachments = attachments
     }
 
-    /// 这次调用的 Model 的能力；Connection 里没有缓存这个 Model 时用保守默认。
+    /// 这次调用的 Model 的能力，见 `Connection.capabilities(ofModel:)`。
     public var capabilities: ModelCapabilities {
-        connection.models.first { $0.id == modelID }?.capabilities ?? .conservative
+        connection.capabilities(ofModel: modelID)
     }
 }
 

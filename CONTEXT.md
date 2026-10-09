@@ -57,7 +57,7 @@ _Avoid_: tool 消息（工具调用和结果是 assistant Message 的一部分�
 _Avoid_: 附件文件、Upload、截图（v1 没有内置截图，截图只是用户粘贴进来的一张图片）
 
 **Web Search**:
-模型在回答过程中自己发起的联网搜索，由 Provider 在服务端执行，app 不调用任何外部搜索服务。只有 Model Capabilities 里支持 Web Search 的 Model 才能用。
+模型在回答过程中自己发起的联网搜索，由 Provider 或 Platform 在服务端执行（Anthropic、Gemini 的原生搜索，OpenRouter、阿里云百炼自带的搜索），app 不调用任何外部搜索服务。只有 Model Capabilities 里支持 Web Search 的 Model 才能用。
 _Avoid_: 联网问答、搜索工具、Tavily
 
 **Citation**:
