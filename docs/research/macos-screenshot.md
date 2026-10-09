@@ -3,7 +3,7 @@
 - 对应 issue：[#3 研究：macOS 截图技术方案](https://github.com/linem7/Chatbot/issues/3)（Part of #1）
 - 日期：2026-10-08
 - 前提：原生 Swift/SwiftUI、macOS 14+、App Store 外分发、**不启用 App Sandbox**（见 README）
-- 术语按 `CONTEXT.md`：**Screenshot** = app 从屏幕捕获、挂到 Message 上的 Attachment，来源有「全屏 / 单窗口 / 自由框选」三种；**Quick Panel** / **Hotkey** 的实现见姊妹文档 [hotkey-and-panel.md](https://github.com/linem7/Chatbot/blob/research/hotkey-and-panel/docs/research/hotkey-and-panel.md)，本文不重复。
+- 术语按 `CONTEXT.md`：**Screenshot** = app 从屏幕捕获、挂到 Message 上的 Attachment，来源有「全屏 / 单窗口 / 自由框选」三种；**Quick Panel** / **Hotkey** 的实现见姊妹文档 [hotkey-and-panel.md](hotkey-and-panel.md)，本文不重复。
 
 ## TL;DR
 

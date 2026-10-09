@@ -32,9 +32,8 @@
 - **仓库已经是 public**（用户为了让 macOS runner 免费而改的）。CI 设计成 push 到 main 和 PR 时都跑，不签名，也不发布。v1 只自用，不发 Release，不做更新检查。
 - **工程里的固定值**：bundle id `com.linem7.Chatbot`，Swift 6 语言模式，测试用 Swift Testing，用 XcodeGen 生成工程（只提交 `project.yml`）。
 
-## 遗留的小事（不影响开发）
+## 其他
 
-- 远程还有 5 个 `research/*` 分支没删，研究 issue（#2–#6）的评论里还链接着它们。要删分支，先把这些链接改成指向 main。
 - Quick Panel 原型在 `prototype/quick-panel` 分支上，在线查看：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH 。最终选定的是「B · 聊天窗式」，结论记在 #15 里。GitHub Pages 目前是关闭的。
 
 ## 建议使用的技能
