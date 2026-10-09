@@ -54,6 +54,15 @@ private struct QuickPanelHeader: View {
             }
             .buttonStyle(.borderless)
             .help("New Conversation (⌘N)")
+            Button {
+                store.openInMainWindow()
+            } label: {
+                Image(systemName: "macwindow")
+                    .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.borderless)
+            .help("Open in Main Window")
+            .disabled(!store.canOpenInMainWindow)
         }
         .frame(maxWidth: .infinity)
         .overlay {
