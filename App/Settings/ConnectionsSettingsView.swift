@@ -242,14 +242,16 @@ private struct ConnectionEditor: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(draft.models) { model in
+                    // 能力按 Connection 算：OpenRouter、百炼上的 Model 都能联网，老 Connection 不用重新拉取（ADR-0003）
+                    let capabilities = draft.makeConnection()?.capabilities(ofModel: model.id) ?? model.capabilities
                     HStack {
                         Toggle(isOn: visibility(of: model.id)) {
                             HStack(spacing: 6) {
                                 Text(verbatim: model.displayName ?? model.id)
-                                if model.capabilities.imageInput {
+                                if capabilities.imageInput {
                                     Image(systemName: "photo").foregroundStyle(.secondary).help("Accepts images")
                                 }
-                                if model.capabilities.webSearch {
+                                if capabilities.webSearch {
                                     Image(systemName: "globe").foregroundStyle(.secondary).help("Can search the web")
                                 }
                             }

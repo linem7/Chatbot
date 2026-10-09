@@ -220,6 +220,34 @@ struct PlatformWebSearchTests {
             == second..<text.utf16.count)
     }
 
+    /// 中文回答里常见「来源：URL。」：URL 后面直接跟中文标点，GFM 的扩展自动链接会把后面的字符一起吞进链接，
+    /// 角标插在这里会变成链接的一部分。所以裸 URL 不标角标。
+    @Test func bareURLFollowedByChinesePunctuationGetsNoMarker() {
+        let text = "今天北京下雨（来源：https://example.com/a。）"
+        let start = "今天北京下雨（来源：".utf16.count
+        let end = start + "https://example.com/a".utf16.count - 1
+        #expect(URLCitationLocator.range(start: start, end: end, url: "https://example.com/a", in: text) == nil)
+        #expect(URLCitationLocator.range(start: nil, end: nil, url: "https://example.com/a", in: text) == nil)
+    }
+
+    /// 来源是 /x、正文里的链接是 /x/y：不能当成命中，更不能把角标插到 URL 中间。
+    @Test func longerURLInTheTextIsNotAMatch() {
+        let text = "参考 [文档](https://example.com/x/y) 。"
+        let start = "参考 ".utf16.count
+        let close = text.utf16.count - 3  // ) 的位置
+        #expect(URLCitationLocator.range(start: nil, end: nil, url: "https://example.com/x", in: text) == nil)
+        // 有偏移时只可能停在整个链接之后，不会停在 URL 中间
+        let range = URLCitationLocator.range(start: start, end: close, url: "https://example.com/x", in: text)
+        #expect(range == nil || range?.upperBound == close + 1)
+    }
+
+    @Test func angleBracketDestinationEndsAfterTheClosingParenthesis() {
+        let link = "[文档](<https://example.com/a b>)"
+        let text = "参考 " + link + "。"
+        let range = URLCitationLocator.range(start: nil, end: nil, url: "https://example.com/a b", in: text)
+        #expect(range == "参考 ".utf16.count..<("参考 " + link).utf16.count)
+    }
+
     @Test func autolinkEndsAfterTheClosingBracket() {
         let text = "见 <https://example.com/a> 。"
         let range = URLCitationLocator.range(start: nil, end: nil, url: "https://example.com/a", in: text)
