@@ -66,7 +66,10 @@ public actor InMemoryMessageStore: MessageStore, TitleStore {
     private func upsert(_ message: Message, conversationID: UUID) {
         var messages = messagesByConversation[conversationID, default: []]
         if let index = messages.firstIndex(where: { $0.id == message.id }) {
-            messages[index] = message
+            // 和 HistoryStore 一致：原地覆盖，保留第一次保存时的 createdAt
+            var replacement = message
+            replacement.createdAt = messages[index].createdAt
+            messages[index] = replacement
         } else {
             messages.append(message)
         }

@@ -168,8 +168,8 @@ public struct TurnRunner: Sendable {
             try await store.saveAssistantMessage(finalAnswer, conversationID: input.conversation.id)
         }
 
-        // §4 第 5 步：第一次 Turn 有了回答，就在后台生成标题，不等它完成
-        if let titleGenerator, input.history.isEmpty, !answer.markdownText.isEmpty,
+        // §4 第 5 步：第一次 Turn 有了回答，就在后台生成标题，不等它完成。Retry 不重新生成
+        if let titleGenerator, input.history.isEmpty, input.replacingAnswerID == nil, !answer.markdownText.isEmpty,
            answer.status == .complete || answer.status == .interrupted {
             Task {
                 await titleGenerator.generateTitle(

@@ -33,7 +33,7 @@ struct RetryTests {
             )
         }
         try await store.saveUserMessage(earlierQuestion, in: conversation)
-        try await store.saveAssistantMessage(earlierAnswer, conversationID: conversation.id)
+        await store.saveAssistantMessage(earlierAnswer, conversationID: conversation.id)
 
         // 第一次：收到一部分之后出错
         let failing = ScriptedAdapter([[.event(.textDelta("晴")), .fail(ChatError.overloaded)]])
@@ -51,6 +51,8 @@ struct RetryTests {
         let saved = await store.messages(in: conversation.id)
         #expect(saved.map(\.id) == [earlierQuestion.id, earlierAnswer.id, question.id, failed.id])
         #expect(saved.last?.markdownText == "晴天")
+        // 和 HistoryStore 一样保留第一次保存时的 createdAt
+        #expect(saved.last?.createdAt == failed.createdAt)
 
         // 请求里不含旧回答
         let request = try #require(retrying.requests.first)
