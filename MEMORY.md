@@ -8,6 +8,7 @@
 - 做决策时务实、偏向砍功能：「快速解决问题」是最高优先级，复杂问题会去别的工具解决。对推荐答案通常直接同意，只在和这个定位冲突时反驳，比如否掉了思考模式、中途换模型、记录 token 用量、内置截图。凡是已经有成熟外部工具能做的事（例如截图），用户倾向于不在 app 里重做，提问前先想一下这个功能是否真的需要。用户也不想额外接第三方服务（例如否掉了 Tavily），宁可接受功能缺失。用户说的「tool call 搜索」指的是模型 API 的原生搜索。
 - 用户强调过：DeepSeek 能看图，只是不能生成图片。图片支持以 `/models` 返回的能力为准，不要凭研究文档断言某个 DeepSeek 模型不支持图片。
 - grilling 等需要用户做选择的提问，**用 AskUserQuestion 工具来问**（2026-10-09 用户明确要求），推荐项放在第一个并标「（推荐）」。不要在聊天里直接列出编号问题。
+- 用户的 macOS 是**英文系统**（2026-10-09 真机验证时发现）。README 等文档里提到 macOS 的 app、菜单、设置位置、系统弹窗，以及 Chatbot 自己的界面文字时，一律写英文原文（例如 Keychain Access、System Settings › Privacy & Security、Settings 的 General 页、Launch at Login），正文仍然用中文。app 的界面文字以 `App/Resources/Localizable.xcstrings` 的英文 key 为准。
 
 ## 进度和待办（截至 2026-10-09）
 
