@@ -15,9 +15,15 @@ let package = Package(
             name: "ChatbotCore",
             dependencies: [.product(name: "GRDB", package: "GRDB.swift")]
         ),
+        // 调试用的命令行：用真实 key 跑一次流式调用，不进 app
+        .executableTarget(
+            name: "chatbot-debug",
+            dependencies: ["ChatbotCore"]
+        ),
         .testTarget(
             name: "ChatbotCoreTests",
-            dependencies: ["ChatbotCore", .product(name: "GRDB", package: "GRDB.swift")]
+            dependencies: ["ChatbotCore", .product(name: "GRDB", package: "GRDB.swift")],
+            resources: [.copy("Fixtures")]
         ),
     ]
 )

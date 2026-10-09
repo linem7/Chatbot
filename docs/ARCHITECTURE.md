@@ -100,6 +100,14 @@ enum ModelEvent {
 ### 3.4 错误映射
 `ChatError` 有 8 个类别：`authentication`、`rateLimited(retryAfter:)`、`overloaded`、`contextTooLong`、`unsupportedInput`、`network`、`invalidRequest`、`providerError(raw)`。每个 adapter 负责把 HTTP 状态码、错误体和流中的错误事件映射到这些类别。例如 Anthropic 的 529 和 DeepSeek 的 `insufficient_system_resource` 都映射为 `overloaded`。取消不属于错误。
 
+OpenAI 兼容 adapter（DeepSeek）的映射按 SPEC §7：
+- 401 → `authentication`；402（余额不足）和 429 → `rateLimited`，429 读 `Retry-After`；
+- 400、422 → `invalidRequest`；所有 5xx 和 `insufficient_system_resource` → `overloaded`；
+- `finish_reason` 为 `aborted`、`content_filter` → `providerError`；`length` 正常结束，不算错误；
+- transport 层的断网、超时 → `network`；流在 `finish_reason` 和 `[DONE]` 之前断开也算 `network`。
+
+`contextTooLong` 是启发式判断：400 且错误体的 `code` 是 `context_length_exceeded`，或 message 含 "maximum context length"。DeepSeek 文档没写这种情况的返回，**还没用真实 key 验证**。
+
 ## 4. Turn
 
 `TurnRunner` 负责执行一次 Turn：
@@ -110,6 +118,8 @@ enum ModelEvent {
 5. 如果这是这个 Conversation 的第一次 Turn，就在后台触发标题生成。
 
 取消用 `Task.cancel()` 实现。UI 状态由一个 `@MainActor @Observable` 的 store 持有，`TurnRunner` 的事件在主 actor 上合并进 store。面板隐藏不影响正在执行的 Turn。
+
+落库通过可注入的 `MessageStore` 协议完成（第 1、4 步）。#19 用内存实现 `InMemoryMessageStore`，#20 换成 GRDB 实现。
 
 ## 5. 数据模型与存储（ADR-0004）
 

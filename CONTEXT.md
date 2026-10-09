@@ -64,8 +64,12 @@ _Avoid_: 引用链接、Source
 从用户发出一条 Message 开始，到模型给出最终回答为止的整个过程。中间可能包含多次模型调用和工具调用。
 
 **Interrupted**:
-Message 的一种状态：Turn 被用户取消或中途出错，但已经收到的部分内容保留了下来。用户取消不算错误。
+Message 的一种状态：Turn 被用户取消，已经收到的部分内容保留了下来。用户取消不算错误。
 _Avoid_: 失败、Cancelled Message
+
+**Failed**:
+Message 的一种状态：Turn 中途出错，已经收到的部分内容保留了下来，并记下错误类别（SPEC §7）。
+_Avoid_: Interrupted（出错不是中断）、Error Message
 
 **Retry**:
 当 Conversation 的最后一条 assistant Message 是 Interrupted 或出错时，用同一条用户 Message 重新执行一次 Turn，新的回答替换旧的。只能对最后一条使用。
