@@ -44,6 +44,14 @@ final class ConnectionStore {
         }
     }
 
+    /// 删除一个 Connection。Default Model 属于它时清空，由用户在通用页重新选（SPEC §9）。
+    /// 它的 Conversation 和 Keychain 里的 key 由调用方删除。
+    func delete(_ connectionID: UUID) {
+        connections.removeAll { $0.id == connectionID }
+        Self.write(connections, forKey: Self.connectionsKey, to: defaults)
+        if defaultModel?.connectionID == connectionID { defaultModel = nil }
+    }
+
     /// 模型选择器里列出的 Model：按 Connection 分组，去掉隐藏的。
     func visibleModels(of connection: Connection) -> [ModelInfo] {
         connection.models.filter { !connection.hiddenModelIDs.contains($0.id) }

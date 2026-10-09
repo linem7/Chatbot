@@ -187,6 +187,13 @@ final class ChatStore {
         await waitForPendingTurns(of: conversationID)
     }
 
+    /// 删除一个 Connection（连同它的 Conversation）之前调用。当前对话用的是它时，先停止生成并换成新对话。
+    /// 这里等全部还在收尾的 Turn：删 Connection 很少见，不值得再记一份 Turn 和 Connection 的对应。
+    func prepareToDeleteConnection(_ connectionID: UUID) async {
+        if conversation?.connectionID == connectionID { newConversation() }
+        await waitForPendingTurns()
+    }
+
     /// 「清空全部历史」之前调用：停止生成，清掉当前对话，新开一个（SPEC §9）。
     func prepareToDeleteAll() async {
         newConversation()
@@ -237,9 +244,14 @@ final class ChatStore {
         Task { try? await history.saveWebSearchEnabled(enabled, conversationID: id) }
     }
 
-    /// 设置里保存了 Connection 之后调用：之前没有可用的 Model 时，现在补一个 Conversation。
+    /// 设置里保存或删除了 Connection 之后调用：之前没有可用的 Model 时，现在补一个 Conversation；
+    /// 当前对话的 Connection 被删掉了，就新开一个。
     func connectionsDidChange() {
-        if conversation == nil { conversation = makeConversation() }
+        if let conversation, connections.connection(id: conversation.connectionID) == nil {
+            newConversation()
+        } else if conversation == nil {
+            conversation = makeConversation()
+        }
     }
 
     private func makeConversation(model: ModelRef? = nil) -> Conversation? {
@@ -295,7 +307,7 @@ final class ChatStore {
             conversation: conversation,
             connection: connection,
             apiKey: apiKey,
-            systemPrompt: SystemPrompt.default(),
+            systemPrompt: SystemPrompt.forRequest(),
             history: history,
             userMessage: userMessage,
             attachments: attachments

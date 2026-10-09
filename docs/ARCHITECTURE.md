@@ -152,7 +152,9 @@ OpenAI 兼容 adapter（DeepSeek）的映射按 SPEC §7：
 ### 5.1 设置类数据
 - **Connection 列表**：名称、Provider、base URL、隐藏的 Model、缓存的 Model 列表及其能力。以 JSON 形式存在 UserDefaults。
 - **API key**：每个 Connection 一条 Keychain 通用密码（service 为 `com.linem7.Chatbot.apikey`，account 为 Connection ID）。第一次用到时读取，之后缓存在内存里。
-- **其他设置**也存在 UserDefaults：Default Model、system prompt、开机启动等。Hotkey 由 KeyboardShortcuts 自己存。
+- **其他设置**也存在 UserDefaults：Default Model、system prompt、首次启动标记等。开机启动的状态以 `SMAppService.mainApp.status` 为准，不另外存；Hotkey 由 KeyboardShortcuts 自己存。
+- **system prompt**：UserDefaults 里只存用户可编辑的文本。发送时由 app 在最前面加一行「Today is <日期>.」（日期每天变化，对 Anthropic 回传思考块的影响见 §3.2 的处理）。
+- **Connection 模板**（App 侧的 `ConnectionTemplate`）：DeepSeek、Anthropic、Gemini 用 Core 的 `Connection.deepSeek()` 等；OpenAI 用 OpenAI 兼容 Provider，base URL 是 `https://api.openai.com/v1`（adapter 直接在 base 后面拼 `/chat/completions`，所以要带 `/v1`，DeepSeek 不带）；自定义可以选 Provider、填 base URL。
 
 ### 5.2 历史数据库
 位置：`~/Library/Application Support/com.linem7.Chatbot/history.sqlite`。附件副本放在同一目录的 `attachments/<conversationID>/` 下。

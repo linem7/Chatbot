@@ -1,16 +1,6 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "%lld models available": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "可用的 Model：%lld 个"
-          }
-        }
-      }
-    },
     ", ": {
       "comment": "搜索词之间的分隔符",
       "localizations": {
@@ -28,6 +18,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "API Key"
+          }
+        }
+      }
+    },
+    "Accepts images": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以接受图片"
+          }
+        }
+      }
+    },
+    "Add": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加"
+          }
+        }
+      }
+    },
+    "Add Connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加 Connection"
           }
         }
       }
@@ -52,6 +72,66 @@
         }
       }
     },
+    "Add a Connection with the + button, then paste your API key.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点「+」添加一个 Connection，然后粘贴 API key。"
+          }
+        }
+      }
+    },
+    "Add a model ID manually": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "手动填写模型 ID"
+          }
+        }
+      }
+    },
+    "Advanced": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级"
+          }
+        }
+      }
+    },
+    "All conversations and their attachments will be deleted. This can't be undone.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有对话及其附件都会被删除，无法恢复。"
+          }
+        }
+      }
+    },
+    "All conversations that use this Connection will be deleted too. This can't be undone.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用这个 Connection 的所有对话也会一起删除，无法恢复。"
+          }
+        }
+      }
+    },
+    "Allow Chatbot in System Settings › General › Login Items.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在「系统设置 › 通用 › 登录项」里允许 Chatbot。"
+          }
+        }
+      }
+    },
     "Ask anything": {
       "localizations": {
         "zh-Hans": {
@@ -62,12 +142,82 @@
         }
       }
     },
+    "Base URL": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Base URL"
+          }
+        }
+      }
+    },
+    "Can search the web": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以联网搜索"
+          }
+        }
+      }
+    },
     "Chatbot": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Chatbot"
+          }
+        }
+      }
+    },
+    "Choose a Default Model for new conversations.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请为新对话选择一个默认 Model。"
+          }
+        }
+      }
+    },
+    "Clear All History": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空全部历史"
+          }
+        }
+      }
+    },
+    "Clear all history?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要清空全部历史吗？"
+          }
+        }
+      }
+    },
+    "Clear…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空…"
+          }
+        }
+      }
+    },
+    "Connections": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connection"
           }
         }
       }
@@ -132,12 +282,12 @@
         }
       }
     },
-    "DeepSeek": {
+    "Custom": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "DeepSeek"
+            "value": "自定义"
           }
         }
       }
@@ -158,6 +308,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "删除"
+          }
+        }
+      }
+    },
+    "Delete Connection…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除 Connection…"
+          }
+        }
+      }
+    },
+    "Delete “%@”?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "要删除「%@」吗？"
+          }
+        }
+      }
+    },
+    "Deletes every conversation and its attachments.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除所有对话及其附件。"
+          }
+        }
+      }
+    },
+    "Enter a valid base URL, starting with https://.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请填写有效的 base URL，以 https:// 开头。"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        }
+      }
+    },
+    "Hotkey": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局快捷键"
           }
         }
       }
@@ -192,6 +402,46 @@
         }
       }
     },
+    "Launch at Login": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开机时启动"
+          }
+        }
+      }
+    },
+    "Model ID": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "模型 ID"
+          }
+        }
+      }
+    },
+    "Models": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Model"
+          }
+        }
+      }
+    },
+    "Name": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "名称"
+          }
+        }
+      }
+    },
     "Network connection failed.": {
       "localizations": {
         "zh-Hans": {
@@ -208,6 +458,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "新对话（⌘N）"
+          }
+        }
+      }
+    },
+    "No Connection": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有 Connection"
           }
         }
       }
@@ -232,6 +492,36 @@
         }
       }
     },
+    "No models yet. Save to fetch them, or add a model ID below.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有 Model。保存后会自动拉取，也可以在下面手动填写模型 ID。"
+          }
+        }
+      }
+    },
+    "None": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无"
+          }
+        }
+      }
+    },
+    "Open Login Items": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开登录项"
+          }
+        }
+      }
+    },
     "Open Main Window": {
       "localizations": {
         "zh-Hans": {
@@ -248,6 +538,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "在主窗口中打开"
+          }
+        }
+      }
+    },
+    "OpenAI Compatible": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI 兼容"
+          }
+        }
+      }
+    },
+    "Paste an API key.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请粘贴 API key。"
+          }
+        }
+      }
+    },
+    "Paste your API key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴 API key"
           }
         }
       }
@@ -272,6 +592,16 @@
         }
       }
     },
+    "Provider": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provider"
+          }
+        }
+      }
+    },
     "Quit Chatbot": {
       "localizations": {
         "zh-Hans": {
@@ -292,6 +622,16 @@
         }
       }
     },
+    "Restore Default": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "恢复默认"
+          }
+        }
+      }
+    },
     "Save": {
       "localizations": {
         "zh-Hans": {
@@ -302,12 +642,32 @@
         }
       }
     },
+    "Save Without Testing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不测试，直接保存"
+          }
+        }
+      }
+    },
     "Saved — paste a new key to replace it": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "已保存，粘贴新的 key 可以替换"
+          }
+        }
+      }
+    },
+    "Saving fetches the model list, which also tests the connection.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存时会拉取 Model 列表，这一步同时就是连接测试。"
           }
         }
       }
@@ -372,6 +732,16 @@
         }
       }
     },
+    "System Prompt": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Prompt"
+          }
+        }
+      }
+    },
     "The API key is invalid or has expired.": {
       "localizations": {
         "zh-Hans": {
@@ -432,6 +802,16 @@
         }
       }
     },
+    "Today's date is added at the start automatically.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送时会自动在最前面加上当天日期。"
+          }
+        }
+      }
+    },
     "Too many requests or out of quota.": {
       "localizations": {
         "zh-Hans": {
@@ -488,16 +868,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "有什么可以帮你？"
-          }
-        }
-      }
-    },
-    "sk-…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "sk-…"
           }
         }
       }
