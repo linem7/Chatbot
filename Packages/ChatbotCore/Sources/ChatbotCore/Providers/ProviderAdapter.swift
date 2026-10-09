@@ -77,21 +77,7 @@ extension Provider {
         case .anthropic:
             AnthropicAdapter(transport: transport)
         case .gemini:
-            // #24 实现
-            UnimplementedAdapter(provider: self)
+            GeminiAdapter(transport: transport)
         }
-    }
-}
-
-/// 还没实现的 Provider：调用时直接报错。
-struct UnimplementedAdapter: ProviderAdapter {
-    let provider: Provider
-
-    func stream(_ request: ModelRequest) -> AsyncThrowingStream<ModelEvent, any Error> {
-        AsyncThrowingStream { $0.finish(throwing: ChatError.providerError("\(provider.rawValue) 还没有实现")) }
-    }
-
-    func listModels(_ connection: Connection, apiKey: String) async throws -> [ModelInfo] {
-        throw ChatError.providerError("\(provider.rawValue) 还没有实现")
     }
 }

@@ -100,6 +100,15 @@ enum ModelEvent {
 - `stop_reason`：`refusal`（安全分类器拒答）报 `providerError`，不开服务端 fallback，因为 Conversation 的 Model 创建后不换；`model_context_window_exceeded` 按 `length` 处理。
 - 错误映射：401 → authentication；402（billing）和 429 → rateLimited；400 里的 "prompt is too long" 和 413（请求超过 32MB，多半是图片和附件太多）→ contextTooLong，其他 400 和 404 → invalidRequest；所有 5xx（含 529）→ overloaded；流中的 `event: error` 按 `error.type` 映射。
 
+**Gemini adapter 的实现要点**（#24）：
+- 请求：`POST {base}/v1beta/models/{model}:streamGenerateContent?alt=sse`，key 放在 `x-goog-api-key` 头里。
+- 思考：按内置表 `GeminiModelTable` 发每个模型支持的最低档（见 §8 第 2 条），不认识的模型什么都不发；`thought: true` 的 Part 不展示。
+- 原样回传：每个 SSE 事件是一个完整的 `GenerateContentResponse`。收到的每个 Part（包括空文本、只带 `thoughtSignature` 的 Part）都通过 `providerData` 交给 TurnRunner，累积在 `opaque(.gemini, [Part…])` 里。complete 的回答逐个原样发回，不合并（带签名的 Part 不能和别的 Part 合并）；interrupted 或 failed 的回答只发文字。
+- Google Search：`groundingMetadata` 以 `{"groundingMetadata": …}` 的形式放进同一串不透明数据，供 App 渲染 `searchEntryPoint.renderedContent`（必须展示），回传时跳过。Citation 由 `groundingSupports` 换算成 UTF-16 范围。
+- 能力：`/v1beta/models` 只用来拿模型列表和 token 上限（只保留能 `generateContent` 的聊天模型）；图片和搜索能力来自内置表。
+- `finishReason`：`MAX_TOKENS` → length；`SAFETY`、`RECITATION`、`BLOCKLIST`、`PROHIBITED_CONTENT`、`SPII` 等 → providerError；`promptFeedback.blockReason` → providerError。
+- 错误映射：key 无效（400 + `API_KEY_INVALID`）、401、403 → authentication；429（读 `RetryInfo.retryDelay`）→ rateLimited；400 里的 "exceeds the maximum number of tokens" → contextTooLong，其他 400 和 404 → invalidRequest；5xx → overloaded。流中途的 `{"error": …}` 按同样的规则映射。
+
 **Model Capabilities 的来源优先级**：接口报告 > 内置表 > 保守默认。保守默认是「只支持文本和 tools，不支持图片，不支持搜索」。用户不能手动修改。
 
 ### 3.3 SSE 解析器（自己写，不引入库）
@@ -207,11 +216,13 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
      - 按 (code, language, colorScheme) 缓存高亮结果；
      - MarkdownUI 每次都整体重新解析，所以流式中的 Message 单独成为一个 view，只重绘最后一条；
      - 2.4.1 的 `Theme` 不是 Sendable，Swift 6 下自定义主题可能报错。可以给自定义主题加 `@MainActor`，或者把依赖钉到 main 上「make the Theme type support Swift 6 (#351)」那个 commit。
-2. **Gemini**：
-   - 哪些模型无法完全关闭思考；
-   - 流中途出错时的格式；
-   - `functionCall` 会不会被拆到多个 chunk 里；
-   - `groundingSupports` 的偏移单位是字节还是字符（文档前后不一致）。
+2. **Gemini**（按文档核实，2026-10-09，#24）：
+   - **API 仍用 `generateContent`**：文档页已标为「Gemini Generate Content API (Legacy)」，默认文档换成了 Interactions API。但截至 2026-10-09 没有停用计划：[Deprecations 页面](https://ai.google.dev/gemini-api/docs/deprecations)（2026-10-07 更新）只列了模型的停用；[changelog](https://ai.google.dev/gemini-api/docs/changelog) 里 2026-05-06 的「legacy schema 移除」说的是 Interactions API 自己的旧格式；2026-06-17 还给 `streamGenerateContent` 加了新功能。
+   - **哪些模型无法完全关闭思考**（[thinking 文档](https://ai.google.dev/gemini-api/docs/generate-content/thinking)）：2.5 Flash、Flash-Lite 能关（`thinkingBudget: 0`）；2.5 Pro 最少 128；3.1 Pro 最低 `thinkingLevel: low`；3.x Flash 和 Flash-Lite 都关不掉，最低是 `minimal`，3.7、3.8 Flash 发 `minimal` 会报错，最低是 `low`。已做成内置表 `GeminiModelTable`。
+   - **`groundingSupports` 的偏移单位**：文档仍然没写，官方示例本身也对不上。实现上不依赖单位，按 UTF-8 字节换算后和 `segment.text` 对照，对不上就在正文里找 `segment.text`。**需要用真实 key、用中文问题核实一次。**
+   - **流中途出错的格式**：文档没写。按 Google API 通用的 `{"error": {...}}` 宽松解码。**需要真机核实。**
+   - **`groundingMetadata` 在哪个 chunk 出现**：文档没写。每个 chunk 都检查，保留最后一次的；正文开始前就拿到的搜索词立刻显示。**需要真机核实。**
+   - **`functionCall` 会不会被拆到多个 chunk 里**：v1 没有 app 侧工具，暂不影响。
 3. **Hotkey 和面板**（`hotkey-and-panel.md` §6，需要在真机上验证）：
    - 非激活面板里 SwiftUI 输入框第一次能否可靠获得焦点；
    - 全屏 app 上方用 `.floating` 层级是否足够。

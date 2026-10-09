@@ -11,7 +11,7 @@
   - 关不掉的（Claude Opus 5.5、Fable）走默认的 adaptive。
   - 只要 Model 支持 low effort，都发 `output_config.effort: "low"`，把思考和延迟压到最少。
   - Model 返回的思考块不展示，作为不透明数据原样回传（[ADR-0001](0001-provider-adapter-single-call-turn-drives-tools.md)）。
-- **Gemini**：部分模型无法完全关闭思考，请求最低的思考级别，并丢弃思考内容。
+- **Gemini**：同样能关就关。按内置表处理：2.5 Flash、Flash-Lite 发 `thinkingBudget: 0` 关闭；关不掉的（2.5 Pro、3.x 系列）发它支持的最低档（`thinkingBudget: 128`、`thinkingLevel: minimal` 或 `low`）；不认识的模型什么都不发。思考摘要（`thought: true` 的 Part）不展示。
 
 UI 里没有推理区域，也没有思考开关。
 

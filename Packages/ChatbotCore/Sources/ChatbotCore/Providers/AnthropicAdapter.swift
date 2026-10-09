@@ -142,7 +142,9 @@ public struct AnthropicAdapter: ProviderAdapter {
             body["thinking"] = .object(["type": .string("disabled")])
         case .betweenTools:
             body["thinking"] = .object(["type": .string("between_tools")])
-        case .adaptive where replaysThinking(messages):
+        // 能力未知（Connection 里没缓存这个 Model）但回传了思考块：既然产生过思考块，这个 Model 一定支持思考，
+        // 同样用 adaptive + drop_block 兜底
+        case .adaptive where replaysThinking(messages), .unknown where replaysThinking(messages):
             // 思考块的签名绑定了 system、tools 和之前的消息。system 里的日期变了、地球按钮切换了 tools 时，
             // 原样回传的思考块会让请求一直 400；drop_block 让服务端丢掉对不上的块，回答照常进行（ADR-0002）
             body["thinking"] = .object([
