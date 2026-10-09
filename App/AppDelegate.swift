@@ -26,9 +26,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Hotkey.warnIfTakenBySystem()
 
-        // 启动时清理一次，之后每 24 小时一次（SPEC §8）
+        // 启动时清理一次，之后每 24 小时一次（SPEC §8）。删掉了东西就让 Main Window 刷新。
         let history = history
-        cleanup = Task { await history.runPeriodicCleanup() }
+        let chatStore = chatStore
+        cleanup = Task {
+            while !Task.isCancelled {
+                if let deleted = try? await history.deleteExpiredConversations(), deleted > 0 {
+                    chatStore.historyDidChange()
+                }
+                try? await Task.sleep(for: .seconds(86_400))
+            }
+        }
+        Task { await chatStore.restoreRecentConversation() }
     }
 
     /// 退出时，正在生成的回答以 Interrupted 保存（SPEC §8）。等它落库再退出，最多等几秒。

@@ -40,8 +40,9 @@ final class ChatStore {
     private var lastTurnEndedAt: Date?
     /// 历史有变化（新消息、回答结束、生成了标题）时加一，Main Window 据此刷新列表。
     private(set) var historyRevision = 0
-    /// 还没收尾的 Turn，包括已经取消、正在把 Interrupted 落库的。删除和退出前要等它们结束。
-    @ObservationIgnored private var pendingTurns: [ObjectIdentifier: Task<Void, Never>] = [:]
+    /// 还没收尾的 Turn，包括已经取消、正在把 Interrupted 落库的，按所属的 Conversation 记下。
+    /// 删除一个对话前只等它自己的 Turn；清空全部和退出前等全部。
+    @ObservationIgnored private var pendingTurns: [ObjectIdentifier: PendingTurn] = [:]
 
     /// 由菜单栏的视图注入：在 SwiftUI 场景之外打开设置窗口。
     @ObservationIgnored var openSettings: @MainActor () -> Void = {}
@@ -144,14 +145,31 @@ final class ChatStore {
     func open(_ conversationID: UUID) async {
         if conversation?.id != conversationID {
             guard let stored = try? await history.conversation(conversationID) else { return }
-            let storedMessages = (try? await history.messages(in: conversationID)) ?? []
-            let storedAttachments = (try? await history.attachments(in: conversationID)) ?? []
-            newConversation()
-            conversation = stored
-            messages = storedMessages
-            rememberAttachments(storedAttachments)
+            await load(stored)
         }
         lastTurnEndedAt = .now
+    }
+
+    /// 启动时调用：最近一个 Conversation 的最后一条消息不到 10 分钟，就把它装回来，
+    /// 这样重启后马上唤起面板，仍然接着上一个对话（SPEC §2.3）。
+    func restoreRecentConversation(now: Date = .now) async {
+        guard messages.isEmpty, !isGenerating,
+              let latest = try? await history.conversations().first,
+              now.timeIntervalSince(latest.lastMessageAt) < Self.continuationWindow,
+              // 读历史期间用户可能已经开始提问了
+              messages.isEmpty, !isGenerating
+        else { return }
+        await load(latest)
+        lastTurnEndedAt = latest.lastMessageAt
+    }
+
+    private func load(_ stored: Conversation) async {
+        let storedMessages = (try? await history.messages(in: stored.id)) ?? []
+        let storedAttachments = (try? await history.attachments(in: stored.id)) ?? []
+        newConversation()
+        conversation = stored
+        messages = storedMessages
+        rememberAttachments(storedAttachments)
     }
 
     /// 「在主窗口中打开」：只有已经发过消息（已经存进历史）的对话才能打开。
@@ -162,10 +180,11 @@ final class ChatStore {
     }
 
     /// 删除一个 Conversation 之前调用。删的是当前对话时，先停止生成并换成新对话；
-    /// 再等所有还在收尾的 Turn 落库，免得删除之后回答又写回去。
+    /// 再等这个对话还在收尾的 Turn 落库，免得删除之后回答又写回去。
+    /// 别的对话正在生成时不用等它：删除无关的对话会立即完成。
     func prepareToDelete(_ conversationID: UUID) async {
         if conversation?.id == conversationID { newConversation() }
-        await waitForPendingTurns()
+        await waitForPendingTurns(of: conversationID)
     }
 
     /// 「清空全部历史」之前调用：停止生成，清掉当前对话，新开一个（SPEC §9）。
@@ -185,10 +204,19 @@ final class ChatStore {
 
     var hasPendingTurns: Bool { !pendingTurns.isEmpty }
 
-    private func waitForPendingTurns() async {
-        for task in pendingTurns.values {
+    /// 等还在收尾的 Turn 结束。给了 conversationID 时只等这个对话的。
+    private func waitForPendingTurns(of conversationID: UUID? = nil) async {
+        let tasks = pendingTurns.values
+            .filter { conversationID == nil || $0.conversationID == conversationID }
+            .map(\.task)
+        for task in tasks {
             await task.value
         }
+    }
+
+    /// 历史在 ChatStore 之外变了（例如 30 天清理），让 Main Window 刷新。
+    func historyDidChange() {
+        historyRevision += 1
     }
 
     private func titleWasGenerated(_ generated: GeneratedTitle) {
@@ -265,10 +293,11 @@ final class ChatStore {
         self.turn = turn
         let key = ObjectIdentifier(turn)
         let conversationID = conversation.id
-        pendingTurns[key] = Task {
+        let task = Task {
             await consume(turn, conversationID: conversationID)
             pendingTurns[key] = nil
         }
+        pendingTurns[key] = PendingTurn(conversationID: conversationID, task: task)
     }
 
     /// 停止生成（⌘. 或停止按钮）。Esc 和失焦只隐藏面板，不调用它。
@@ -325,6 +354,12 @@ final class ChatStore {
             messages.append(message)
         }
     }
+}
+
+/// 一个还没收尾的 Turn。
+private struct PendingTurn {
+    let conversationID: UUID
+    let task: Task<Void, Never>
 }
 
 /// 后台生成的一个标题。

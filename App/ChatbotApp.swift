@@ -88,11 +88,15 @@ enum AppWindow {
         bringToFront { $0.identifier?.rawValue.hasPrefix(mainWindowID) == true }
     }
 
+    /// 先按 identifier 找；SwiftUI 的窗口命名是内部细节，找不到时退而求其次，
+    /// 取最前面的一个可见普通窗口（刚打开的窗口通常就在最前面）。
     private static func bringToFront(where matches: @escaping @MainActor (NSWindow) -> Bool) {
         Task {
             // 窗口在 open 之后的下一轮才创建
             try? await Task.sleep(for: .milliseconds(100))
-            guard let window = NSApp.windows.first(where: { matches($0) }) else { return }
+            let window = NSApp.windows.first(where: { matches($0) })
+                ?? NSApp.orderedWindows.first(where: { $0.isVisible && $0.canBecomeMain && !($0 is NSPanel) })
+            guard let window else { return }
             window.orderFrontRegardless()
             window.makeKey()
         }
