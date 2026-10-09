@@ -78,7 +78,7 @@ enum ModelEvent {
 | | OpenAI 兼容（DeepSeek 等） | Anthropic Messages | Gemini `generateContent` |
 |---|---|---|---|
 | 端点 | `POST {base}/chat/completions`（DeepSeek 的 base URL 不带 `/v1`） | `POST /v1/messages` | `POST /v1beta/models/{m}:streamGenerateContent?alt=sse` |
-| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | Model 能关（capabilities 的 `thinking.types.disabled`）就发 `thinking: disabled`，关不掉的（Opus 5.5、Sonnet 5.5、Fable）不发；支持时都发 `output_config.effort: "low"`。思考块不展示，原样回传 | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
+| 关闭思考 | DeepSeek 发 `thinking: {type: "disabled"}`；不发它不支持的 OpenAI 字段（`n`、`seed`、`parallel_tool_calls` 等） | Model 能关（capabilities 的 `thinking.types.disabled`）就发 `thinking: disabled`，关不掉的（Opus 5.5、Sonnet 5.5、Fable）不发；支持时都发 `output_config.effort: "low"`。思考块不展示，作为不透明数据原样回传（ADR-0002） | `thinkingConfig` 设为最低级别，丢弃 `thought: true` 的 Part |
 | system prompt | `role: "system"` 消息 | 顶层 `system` | 顶层 `systemInstruction` |
 | 图片 | `image_url` + base64 data URL | `image` block，base64 | `inlineData`，base64 |
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |

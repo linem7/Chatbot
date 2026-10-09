@@ -1,5 +1,6 @@
 import ChatbotCore
-// Swift Testing 也有一个 Attachment 类型；在类型位置上要明确用 ChatbotCore 的
+// Swift Testing 自己也有一个 Attachment 类型。不加这一行时，Attachment 用在类型位置（例如参数类型）上会有歧义，
+// 而编译器报出来的是一串看不出原因的类型推断错误（"type 'Any' has no member ..."）。
 import struct ChatbotCore.Attachment
 import Foundation
 import Testing
