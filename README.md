@@ -60,16 +60,57 @@
 
 ## 安装
 
-v1 只自用，不对外发布：在本机用 Xcode 构建后安装。app 用一张固定的自签名证书签名，没有经过 Apple 公证。首次启动会打开设置，选择 DeepSeek 模板，粘贴 API key 即可开始使用。具体构建步骤会在写代码时补到这里。
+v1 只自用，不对外发布：在本机构建后安装。app 用一张固定的自签名证书签名，没有经过 Apple 公证（[ADR-0005](docs/adr/0005-self-signed-certificate-no-notarization.md)）。首次启动会打开设置，选择 DeepSeek 模板，粘贴 API key 即可开始使用。
+
+### 准备
+
+- macOS 26 和 Xcode 26
+- XcodeGen：`brew install xcodegen`
+
+### 创建自签名证书（只需做一次）
+
+API key 存在钥匙串里，钥匙串按签名身份判断访问权限。所以每次构建都要用**同一张**证书签名，否则重新构建后读 key 时会反复弹窗。
+
+1. 打开「钥匙串访问」，菜单选「钥匙串访问 → 证书助理 → 创建证书…」。
+2. 名称填 `Chatbot Self-Signed`（必须和 `project.yml` 里的 `CODE_SIGN_IDENTITY` 一致），身份类型选「自签名根证书」，证书类型选「代码签名」。
+3. 勾选「让我覆盖这些默认值」，有效期填 `7300`（20 年），其余一路默认，钥匙串选「登录」。
+4. 在「登录」钥匙串里双击这张证书，展开「信任」，把「代码签名」设为「始终信任」，关闭窗口并输入密码确认。
+5. 在终端确认它能用于签名：
+
+   ```sh
+   security find-identity -v -p codesigning
+   ```
+
+   输出里应该有一行 `"Chatbot Self-Signed"`。
+6. **备份**：在钥匙串里右键这张证书 →「导出」，存成 `.p12` 并设密码，放到安全的地方。私钥丢了就只能换证书，换证书后第一次读 key 会再弹一次钥匙串授权。
+
+### 构建和安装
+
+```sh
+xcodegen generate                    # 由 project.yml 生成 Chatbot.xcodeproj
+xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Release \
+  -derivedDataPath build build
+cp -R build/Build/Products/Release/Chatbot.app /Applications/
+```
+
+也可以 `open Chatbot.xcodeproj` 后在 Xcode 里构建运行。app 只出现在菜单栏，不出现在 Dock。改了 `project.yml` 或增删了源文件后，要重新执行 `xcodegen generate`。
+
+只跑核心逻辑的测试：
+
+```sh
+swift test --package-path Packages/ChatbotCore
+```
+
+CI（`.github/workflows/ci.yml`）在 push 到 main 和 PR 时执行同样的生成、构建和测试，但不签名。
 
 ## 项目状态
 
-规划阶段已经完成，所有关键决策都已锁定（见 [docs/SPEC.md](docs/SPEC.md) 和 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)），接下来开始写代码。
+规划阶段已经完成，所有关键决策都已锁定（见 [docs/SPEC.md](docs/SPEC.md) 和 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)），正在实现 v1。
 
 ## Roadmap
 
 - [x] 技术选型与 v1 规格
-- [ ] 工程骨架与 CI
+- [x] 工程骨架与 CI
 - [ ] 最小可用版本：快捷键唤起 + Quick Panel + DeepSeek 流式对话
 - [ ] 本地历史与主窗口
 - [ ] 图片和文件附件

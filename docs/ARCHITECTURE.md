@@ -31,7 +31,7 @@ App/                         # app target「Chatbot」：界面和系统集成
   Settings/                  # 通用 / Connection / 高级三个标签页
   System/                    # Hotkey、Keychain、开机启动、剪贴板和拖拽的接入
   Rendering/                 # MarkdownUI 主题、代码高亮、Citation 角标、Gemini 搜索建议的 WebView
-Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测试
+Packages/ChatbotCore/        # 本地 SPM 包：不依赖 UI，可以单独测试。以下目录都在 Sources/ChatbotCore/ 下，测试在 Tests/ChatbotCoreTests/
   Domain/                    # Connection、Model、ModelCapabilities、Conversation、Message、ContentBlock、ChatError
   Providers/                 # SSE 解析器、三个 Provider adapter、请求编码和流解码
   Turn/                      # TurnRunner：串起一次回答所需的多次模型调用，处理取消和续接

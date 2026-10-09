@@ -1,0 +1,13 @@
+# XcodeGen 生成的工程（只提交 project.yml）
+*.xcodeproj/
+*.xcworkspace/
+
+# Xcode 和 SwiftPM 的生成物
+DerivedData/
+build/
+.build/
+.swiftpm/
+xcuserdata/
+Package.resolved
+
+.DS_Store
