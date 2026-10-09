@@ -50,7 +50,8 @@
 ## 进度（追加）
 
 - 2026-10-09：百炼的联网能力判断修掉了。之前假设「百炼平台上所有 Model 都能联网」，实际文档的清单按模型名给、而且分地域（北京 / 新加坡 / 全球三张表，全球地域上一个 DeepSeek 都没有）。新增 `BailianModelTable` 查表，`Platform.bailian` 带上地域。**这条推翻了 ADR-0003 原来的说法**，ADR-0003 / SPEC / ARCHITECTURE / research 都已同步。用户要求直接收尾，**没有走 PR**，直接推到了 main（commit 4f45099）。
-- 2026-10-09：新需求「Quick Panel 可以固定，一直在最前」→ issue #59。决策（用户已确认）：固定后 Esc、Hotkey、失焦都**不再**收起面板，只能点图钉取消固定；**不**跨重启记住；开关是 Quick Panel 顶栏的图钉按钮。`hide()` 是唯一的收口，守卫放在那一处。
+- 2026-10-09：#59（Quick Panel 可以固定，一直在最前）实现完并合进 main（PR #60）。决策（用户已确认）：固定后 Esc、Hotkey、失焦都**不再**收起面板，只能点图钉取消固定；**不**跨重启记住；开关是 Quick Panel 顶栏的图钉按钮。`hide()` 是唯一的收口，守卫放在那一处。
+- 2026-10-09：#63（面板可拖动）和 #64（Hotkey 支持连按两次 ⌘）实现完，在 PR #65 里。决策（用户已确认）：只有顶栏空当能拖、位置不持久化（重启回到偏上居中）；⌘ 双击接受辅助功能权限、没授权之前组合键继续可用。两项都**编译过并装到 /Applications，但真机手感还没验证**。
 
 ## 偏好补充
 
@@ -59,5 +60,5 @@
   - `xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Debug -derivedDataPath build build`
   - `swift test --package-path Packages/ChatbotCore`
   - 装 app 用 `./scripts/install.sh`。
-- **网络**：GitHub、Apple 的 CDN 直连不通（curl 15 秒超时、0 字节），命令行工具（git、gh、xcodebuild 拉包）要挂代理，例如 `export https_proxy=http://127.0.0.1:8118 http_proxy=http://127.0.0.1:8118`，详见记忆 `github-needs-local-proxy`。**不要**改全局 git 代理配置（用户没同意过）。
+- **网络**：GitHub、Apple 的 CDN 直连不通（curl 15 秒超时、0 字节），命令行工具（git、gh、xcodebuild 拉包）要挂代理，例如 `export https_proxy=http://127.0.0.1:8118 http_proxy=http://127.0.0.1:8118`，详见记忆 `github-needs-local-proxy`。**不要**改全局 git 代理配置（用户没同意过）。`xcodebuild` 尤其要注意：SPM 解析依赖时会在 `DerivedData/.../SourcePackages/checkouts/` 里 `git clone` 各个包，不挂代理就**卡在那里不动**（不是报错，是一直等），看起来像编译慢。构建前记得 export 代理。
 - 更早的会话在另一台 Linux 机器上跑（swiftly 装 Swift 6.3.3、GRDB 要解 libsqlite3-dev、没有 `URLSession.bytes(for:)`）。那些说明在 Mac 上都不适用：这台没有 `~/.local/share/swiftly`。
