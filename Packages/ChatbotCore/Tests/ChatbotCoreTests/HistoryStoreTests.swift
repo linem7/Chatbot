@@ -241,6 +241,34 @@ struct HistoryStoreTests {
         #expect(!FileManager.default.fileExists(atPath: attachments.path))
     }
 
+    // MARK: 和 TurnRunner 一起
+
+    @Test func cancelledTurnIsSavedAsInterruptedByTheRealStore() async throws {
+        // GRDB 的 write 在已取消的 Task 里会直接抛 CancellationError；TurnRunner 要绕开它
+        let store = try openStore()
+        let adapter = ScriptedAdapter([[.event(.textDelta("一半")), .hang]])
+        let input = TurnInput(
+            conversation: conversation(),
+            connection: .deepSeek(),
+            apiKey: "sk-test",
+            systemPrompt: "",
+            history: [],
+            userMessage: .user("问题")
+        )
+        let handle = TurnRunner(store: store, makeAdapter: { _ in adapter }).run(input)
+        var received = 0
+        for await _ in handle.updates {
+            received += 1
+            if received == 1 { handle.cancel() }
+        }
+
+        let saved = try await openStore().messages(in: input.conversation.id)
+        #expect(saved.count == 2)
+        #expect(saved.first == input.userMessage)
+        #expect(saved.last?.status == .interrupted)
+        #expect(saved.last?.markdownText == "一半")
+    }
+
     private func makeAttachmentDirectory(for conversationID: UUID) throws -> URL {
         let url = directory.appendingPathComponent("attachments/\(conversationID.uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

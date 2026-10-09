@@ -173,6 +173,10 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
 // MARK: - 表结构和行映射
 
 extension HistoryStore {
+    /// 注意：两张 FTS5 表是外部内容表（external content），靠 conversation 和 message 的隐式 rowid 对应。
+    /// 这两张表的主键是 TEXT，rowid 不是主键的别名，执行 VACUUM 可能重新编号 rowid，
+    /// 导致全文索引指向错误的行。所以**不要对这个数据库执行 VACUUM**；
+    /// 真要压缩，先重建 FTS 索引（`INSERT INTO xxx_fts(xxx_fts) VALUES('rebuild')`）。
     static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         migrator.registerMigration("v1") { db in
