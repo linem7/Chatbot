@@ -32,3 +32,6 @@
 
 - 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。可以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ），也可以在征得用户同意后用 GitHub Pages。修改仓库可见性前要先问用户。
 - **当前这台机器是 Linux**，没法构建和运行 Swift/macOS app。用户在 Mac 上开发，CI 用 macOS runner。在这里只能写代码、写文档，要说明代码没有经过编译验证。
+  - 2026-10-09 起这台机器装了 Swift 6.3.3（swiftly，在 `~/.local/share/swiftly`，没改 shell 配置），可以在 Linux 上跑 ChatbotCore 的 `swift test`。用之前先 `source ~/.local/share/swiftly/env.sh`。系统没有 SQLite 头文件，GRDB 要用解到用户目录的 libsqlite3-dev，在仓库根目录执行：
+    `swift test --package-path Packages/ChatbotCore -Xcc -I$HOME/.local/share/sqlite3-dev/root/usr/include -Xlinker -L$HOME/.local/share/sqlite3-dev/root/usr/lib/x86_64-linux-gnu`
+  - Linux 上没有 `URLSession.bytes(for:)`，`URLSessionTransport` 只在 Darwin 上编译，真实网络调用和 App target 仍然只能靠 CI 或用户在 Mac 上验证。
