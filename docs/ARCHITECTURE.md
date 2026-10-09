@@ -87,7 +87,7 @@ enum ModelEvent {
 | Web Search | 不支持 | `tools: [{type: "web_search_20250305", name: "web_search", max_uses: 3}]`；要处理 `stop_reason: "pause_turn"`；`server_tool_use` 和 `web_search_tool_result` 块原样保存、原样回传 | `tools: [{google_search: {}}]`；用 `groundingMetadata` 生成 Citation；`searchEntryPoint.renderedContent` 存进 providerData，供 UI 渲染 |
 | 结束标记 | `data: [DONE]`；DeepSeek 的 usage 挂在最后一个内容 chunk 上（v1 不使用） | `event: message_stop`；流中可能出现 `event: error` | 带 `finishReason` 的 chunk 加 EOF |
 | 必须原样回传的数据 | 无（思考已关闭） | 整串原生内容块：`thinking`（含 `signature`）、`server_tool_use`、`web_search_tool_result`（含 `encrypted_content`）、带 `citations` 的 `text`（含 `encrypted_index`） | `thoughtSignature`（必须留在原来的 Part 上） |
-| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models`（分页）的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported`；capabilities 原文和 `max_tokens` 存进 ModelInfo，adapter 判断思考、effort 和 `max_tokens` 时用；接口没报告 capabilities 时（中转多半只返回 OpenAI 风格的列表）按内置表 `AnthropicModelTable` 兜底：`claude-*` 视为支持图片和搜索，思考和 effort 也按表处理 | 内置表（按模型名判断），接口只提供 token 上限；中转返回 OpenAI 风格的列表（`data[].id`）时同样按内置表 |
+| 能力来源 | DeepSeek：`GET /models` 的 `input_modalities`；tools 视为支持；搜索一律不支持 | `GET /v1/models`（分页）的 `capabilities.image_input` 和 `capabilities.server_tools.web_search.supported`；capabilities 原文和 `max_tokens` 存进 ModelInfo，adapter 判断思考、effort 和 `max_tokens` 时用；接口没报告 capabilities 时（中转多半只返回 OpenAI 风格的列表）按内置表 `AnthropicModelTable` 兜底：`claude-*` 视为支持图片和搜索，思考和 effort 也按表处理，别家的模型不列出来 | 内置表（按模型名判断），接口只提供 token 上限；中转返回 OpenAI 风格的列表（`data[].id`）时同样按内置表 |
 
 **Anthropic adapter 的实现要点**（#23）：
 - 请求：`POST {base}/v1/messages`，头部 `x-api-key` 和 `anthropic-version: 2023-06-01`。OpenRouter 的 Messages 端点（base URL `https://openrouter.ai/api`）只认 `Authorization: Bearer`，按 Platform 改发这个头；其他中转发 `x-api-key`，不两个都发（#51）。`max_tokens` 取 Model 报告的上限，最多 64000；不知道上限时用 16000。
@@ -109,7 +109,7 @@ enum ModelEvent {
 - 思考：按内置表 `GeminiModelTable` 发每个模型支持的最低档（见 §8 第 2 条），不认识的模型什么都不发；`thought: true` 的 Part 不展示。
 - 原样回传：每个 SSE 事件是一个完整的 `GenerateContentResponse`。收到的每个 Part（包括空文本、只带 `thoughtSignature` 的 Part）都通过 `providerData` 交给 TurnRunner，累积在 `opaque(.gemini, [Part…])` 里。complete 的回答逐个原样发回，不合并（带签名的 Part 不能和别的 Part 合并）；interrupted 或 failed 的回答只发文字。
 - Google Search：`groundingMetadata` 以 `{"groundingMetadata": …}` 的形式放进同一串不透明数据，供 App 渲染 `searchEntryPoint.renderedContent`（必须展示），回传时跳过。Citation 由 `groundingSupports` 换算成 UTF-16 范围。
-- 能力：`/v1beta/models` 只用来拿模型列表和 token 上限（只保留能 `generateContent` 的聊天模型）；图片和搜索能力来自内置表。中转只返回 OpenAI 风格的列表（`{"data": [{"id": …}]}`）时也接受，同样只保留 `gemini-*` 的聊天模型（#51）。
+- 能力：`/v1beta/models` 只用来拿模型列表和 token 上限（只保留能 `generateContent` 的聊天模型）；图片和搜索能力来自内置表。中转只返回 OpenAI 风格的列表（`{"data": [{"id": …}]}`）时也接受，同样只保留 `gemini-*` 的聊天模型；ID 带厂商前缀（`google/gemini-…`）时去掉前缀再查表，发请求仍用原始 ID（#51）。
 - `finishReason`：`MAX_TOKENS` → length；`SAFETY`、`RECITATION`、`BLOCKLIST`、`PROHIBITED_CONTENT`、`SPII` 等 → providerError；`promptFeedback.blockReason` → providerError。
 - 错误映射：key 无效（400 + `API_KEY_INVALID`）、401、403 → authentication；429（读 `RetryInfo.retryDelay`）→ rateLimited；400 里的 "exceeds the maximum number of tokens" → contextTooLong，其他 400 和 404 → invalidRequest；5xx → overloaded。流中途的 `{"error": …}` 按同样的规则映射。
 

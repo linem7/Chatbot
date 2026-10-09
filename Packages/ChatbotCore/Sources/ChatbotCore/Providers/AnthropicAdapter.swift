@@ -61,7 +61,7 @@ public struct AnthropicAdapter: ProviderAdapter {
                     throw ChatError.providerError("无法解析 Model 列表")
                 }
                 let fresh = page.data.filter { seen.insert($0.id).inserted }
-                models += fresh.map(\.modelInfo)
+                models += fresh.compactMap(\.modelInfo)
                 guard page.hasMore == true, let lastID = page.lastID, !fresh.isEmpty else { break }
                 afterID = lastID
             }
@@ -464,8 +464,9 @@ private struct ModelPage: Decodable {
 
         /// 图片看 `image_input`，搜索看 `server_tools.web_search`，tools 视为支持（ARCHITECTURE §3.2）。
         /// 能力原文存进 providerData，adapter 判断思考和 effort 时要用。
-        /// 中转和 OpenRouter 常常只返回 OpenAI 风格的列表（只有 `id`），这时 Claude 按内置表视为支持图片和搜索。
-        var modelInfo: ModelInfo {
+        /// 中转和 OpenRouter 常常只返回 OpenAI 风格的列表（只有 `id`），这时 Claude 按内置表视为支持图片和搜索，
+        /// 别家的模型不列出来（OpenRouter 会返回几百个各家的模型；和 Gemini 只保留 `gemini-*` 对称）。
+        var modelInfo: ModelInfo? {
             var result = ModelCapabilities.conservative
             let capabilities = capabilities == .null ? nil : capabilities
             if let capabilities {
@@ -474,6 +475,8 @@ private struct ModelPage: Decodable {
             } else if AnthropicModelTable.isClaude(id) {
                 result.imageInput = true
                 result.webSearch = true
+            } else {
+                return nil
             }
             return ModelInfo(
                 id: id,

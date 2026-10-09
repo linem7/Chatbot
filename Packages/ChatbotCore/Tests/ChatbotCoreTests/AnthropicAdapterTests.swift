@@ -543,15 +543,15 @@ struct AnthropicAdapterTests {
         let transport = StubTransport(body: relayModelList)
         let models = try await AnthropicAdapter(transport: transport).listModels(relay, apiKey: "sk-relay")
 
+        // 不是 Claude 的不列出来
         #expect(models.map(\.id) == [
-            "claude-sonnet-5-5", "claude-opus-5-5", "claude-opus-4-8", "claude-opus-5-20260301", "claude-sonnet-4-5-20250929", "gpt-5.2",
+            "claude-sonnet-5-5", "claude-opus-5-5", "claude-opus-4-8", "claude-opus-5-20260301", "claude-sonnet-4-5-20250929",
         ])
-        // Claude 视为支持图片和搜索（地球按钮可用），不是 Claude 的用保守默认
-        for claude in models.dropLast() {
+        // Claude 视为支持图片和搜索（地球按钮可用）
+        for claude in models {
             #expect(claude.capabilities == ModelCapabilities(imageInput: true, toolCalling: true, webSearch: true))
             #expect(claude.providerData == nil)
         }
-        #expect(models.last?.capabilities == .conservative)
 
         let sent = try #require(transport.requests.first)
         #expect(sent.url.absoluteString == "https://relay.example.com/v1/models?limit=1000")
@@ -587,6 +587,13 @@ struct AnthropicAdapterTests {
         #expect(fields["tools"] == .array([webSearchTool]))
     }
 
+    @Test func modelsWithReportedCapabilitiesAreKeptEvenIfNotClaude() async throws {
+        // 构造的响应：接口报告了 capabilities 的就按接口来，不按名字过滤
+        let body = #"{"data":[{"id":"vendor-model","capabilities":{"image_input":{"supported":false}}}],"has_more":false}"#
+        let models = try await AnthropicAdapter(transport: StubTransport(body: body)).listModels(.anthropic(), apiKey: "k")
+        #expect(models.map(\.id) == ["vendor-model"])
+    }
+
     @Test func capabilitiesReportedByTheAPIWinOverTheBuiltInTable() async throws {
         // 表里 Opus 5.5 关不掉思考；接口说能关就按接口来
         let fields = try await sentBody(request(models: [model("claude-opus-5-5", thinkingCanBeDisabled: true)], modelID: "claude-opus-5-5"))
@@ -605,6 +612,8 @@ struct AnthropicAdapterTests {
         #expect(listRequest.url.absoluteString == "https://openrouter.ai/api/v1/models?limit=1000")
         #expect(listRequest.headers["Authorization"] == "Bearer sk-or")
         #expect(listRequest.headers["x-api-key"] == nil)
+        // OpenRouter 的列表里有各家的模型，只留下 Claude
+        #expect(openRouter.models.map(\.id) == ["anthropic/claude-opus-4.8"])
         #expect(openRouter.models.first?.capabilities.webSearch == true)
 
         let messages = StubTransport(body: textBlock + messageDelta("end_turn") + messageStop)

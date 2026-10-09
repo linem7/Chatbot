@@ -382,6 +382,28 @@ struct GeminiAdapterTests {
         #expect(transport.requests.first?.headers["x-goog-api-key"] == "k")
     }
 
+    @Test func vendorPrefixedRelayIDsAreKeptAndLookedUpWithoutThePrefix() async throws {
+        // 构造的响应：中转给 ID 加了厂商前缀
+        let body = #"{"data":[{"id":"google/gemini-2.5-flash"},{"id":"google/gemini-2.0-flash-lite"},{"id":"google/gemini-embedding-001"}]}"#
+        let relay = Connection(name: "中转", provider: .gemini, baseURL: URL(string: "https://relay.example.com")!)
+        let models = try await GeminiAdapter(transport: StubTransport(body: body)).listModels(relay, apiKey: "k")
+
+        // 保留原始 ID（发请求时用），能力按去掉前缀后的名字查表
+        #expect(models.map(\.id) == ["google/gemini-2.5-flash", "google/gemini-2.0-flash-lite"])
+        #expect(models[0].capabilities == ModelCapabilities(imageInput: true, toolCalling: true, webSearch: true))
+        #expect(models[1].capabilities.webSearch == false)
+
+        // 思考档位同样按去掉前缀后的名字查，请求路径里用原始 ID
+        var connection = relay
+        connection.models = models
+        let request = ModelRequest(
+            connection: connection, apiKey: "k", modelID: "google/gemini-2.5-flash", systemPrompt: "", messages: [.user("Hi")], webSearch: false
+        )
+        let (sent, fields) = try await self.sent(request)
+        #expect(sent.url.absoluteString == "https://relay.example.com/v1beta/models/google/gemini-2.5-flash:streamGenerateContent?alt=sse")
+        #expect(fields["generationConfig"] == .object(["thinkingConfig": .object(["thinkingBudget": .number(0)])]))
+    }
+
     @Test func relayModelListInOpenAIStyleUsesTheBuiltInTable() async throws {
         // 构造的响应：中转只返回 OpenAI 风格的列表，里面还混着别家的模型
         let body = #"{"object":"list","data":[{"id":"gemini-2.5-flash","object":"model"},{"id":"claude-opus-5-5","object":"model"},{"id":"models/gemini-3.5-flash","object":"model"},{"id":"gemini-embedding-001","object":"model"}]}"#
