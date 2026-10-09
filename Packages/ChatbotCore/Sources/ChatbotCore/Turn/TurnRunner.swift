@@ -94,7 +94,7 @@ public struct TurnRunner: Sendable {
         do {
             let store = self.store
             try await Self.ignoringCancellation {
-                try await store.saveUserMessage(input.userMessage, conversationID: input.conversation.id)
+                try await store.saveUserMessage(input.userMessage, in: input.conversation)
             }
 
             var continuations = 0
