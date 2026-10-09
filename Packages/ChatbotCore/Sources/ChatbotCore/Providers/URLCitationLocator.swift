@@ -34,6 +34,12 @@ enum URLCitationLocator {
         return nil
     }
 
+    private static let closeParen = UInt16(UInt8(ascii: ")"))
+    private static let openBracket = UInt16(UInt8(ascii: "["))
+    private static let newline = UInt16(UInt8(ascii: "\n"))
+    private static let lessThan = UInt16(UInt8(ascii: "<"))
+    private static let greaterThan = UInt16(UInt8(ascii: ">"))
+
     /// 正文里离 hint 最近的一处 URL，范围延伸到包住它的链接语法结束。
     private static func linkRange(of url: String, near hint: Int, in utf16: [UInt16]) -> Range<Int>? {
         let needle = Array(url.utf16)
@@ -45,13 +51,13 @@ enum URLCitationLocator {
         guard var start = best else { return nil }
         var end = start + needle.count
         let before = start >= 2 ? Array(utf16[(start - 2)..<start]) : []
-        if before == Array("](".utf16), end < utf16.count, utf16[end] == UInt16(ascii: ")") {
+        if before == Array("](".utf16), end < utf16.count, utf16[end] == Self.closeParen {
             // [标题](URL)：从同一行里前面的 [ 开始，到 ) 结束
             end += 1
             var bracket = start - 2
-            while bracket > 0, utf16[bracket - 1] != UInt16(ascii: "["), utf16[bracket - 1] != UInt16(ascii: "\n") { bracket -= 1 }
-            if bracket > 0, utf16[bracket - 1] == UInt16(ascii: "[") { start = bracket - 1 }
-        } else if start >= 1, utf16[start - 1] == UInt16(ascii: "<"), end < utf16.count, utf16[end] == UInt16(ascii: ">") {
+            while bracket > 0, utf16[bracket - 1] != Self.openBracket, utf16[bracket - 1] != Self.newline { bracket -= 1 }
+            if bracket > 0, utf16[bracket - 1] == Self.openBracket { start = bracket - 1 }
+        } else if start >= 1, utf16[start - 1] == Self.lessThan, end < utf16.count, utf16[end] == Self.greaterThan {
             start -= 1
             end += 1
         }
