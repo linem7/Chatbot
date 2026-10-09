@@ -43,6 +43,30 @@ struct RequestHistoryTests {
         #expect(messages == [user])
     }
 
+    /// 还没出正文就取消了，回答里只有 provider 的原生块。
+    @Test func interruptedAnswerWithOnlyOpaqueBlocksIsDropped() async throws {
+        let opaqueOnly = Message(
+            role: .assistant,
+            status: .interrupted,
+            content: [ContentBlock(.opaque(provider: .anthropic, .object(["type": .string("thinking")])))]
+        )
+        let user = Message.user("再试一次")
+        let messages = try await requestMessages(history: [.user("问题"), opaqueOnly], user: user)
+        #expect(messages == [user])
+    }
+
+    /// 搜索之后出错，回答里只有 webSearch 块。
+    @Test func failedAnswerWithOnlyWebSearchIsDropped() async throws {
+        let searchOnly = Message(
+            role: .assistant,
+            status: .failed(.overloaded),
+            content: [ContentBlock(.webSearch(query: "今天的天气"))]
+        )
+        let user = Message.user("再试一次")
+        let messages = try await requestMessages(history: [.user("今天天气怎么样"), searchOnly], user: user)
+        #expect(messages == [user])
+    }
+
     @Test func partialAnswerIsKept() async throws {
         let question = Message.user("写一段代码")
         let partial = answer("先这样", status: .failed(.overloaded))
