@@ -48,6 +48,10 @@ _Avoid_: 会话、Chat、Thread
 Conversation 里的一条消息，要么来自用户，要么来自模型（assistant）。一条 assistant Message 就是一次 Turn 的完整回答，可以包含多次工具调用和工具结果，最后才是正文。
 _Avoid_: tool 消息（工具调用和结果是 assistant Message 的一部分，不单独成为 Message）
 
+**Attachment**:
+附在用户 Message 上的一个文件，类型是图片、PDF 或文本文件。可以通过「+」、粘贴或拖拽加入，三种方式按同一套规则处理。PDF 以抽取出的文本形式发给模型。
+_Avoid_: 附件文件、Upload、截图（v1 没有内置截图，截图只是用户粘贴进来的一张图片）
+
 **Turn**:
 从用户发出一条 Message 开始，到模型给出最终回答为止的整个过程。中间可能包含多次模型调用和工具调用。
 
