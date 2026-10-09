@@ -194,6 +194,10 @@ private struct ConnectionEditor: View {
                             Text(verbatim: provider.displayName).tag(provider)
                         }
                     }
+                    // 经中转的 Claude、Gemini 用原生格式才能联网（#49）；adapter 会自己拼 /v1、/v1beta
+                    Text("Using a relay for Claude or Gemini? If it supports their native API, choose Anthropic or Gemini here so web search works. Leave /v1 and /v1beta off the base URL.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 } else {
                     LabeledContent("Provider") { Text(verbatim: draft.provider.displayName) }
                 }

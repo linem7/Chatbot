@@ -11,7 +11,7 @@
   - OpenRouter：发 `reasoning: {enabled: false}`；`/models` 报告思考关不掉（`reasoning.mandatory`）的模型，发它支持的最低档 `reasoning.effort`。缓存的 Model 列表里没有这项信息时（升级前保存的 Connection），只给 DeepSeek 发，其他模型不发，以免关不掉思考的模型被拒。
   - 阿里云百炼：发 `enable_thinking: false`；只会思考的模型（deepseek-r1、QwQ、QVQ 等）不发。
   - 不认识的服务什么都不发，以免请求被拒。
-- **Anthropic**：能关就关，按 `/v1/models` 的 capabilities 处理。
+- **Anthropic**：能关就关，按 `/v1/models` 的 capabilities 处理；经中转时接口多半不报告 capabilities，按模型名查内置表，规则相同（#51）。
   - Model 能关闭思考（`thinking.types.disabled.supported` 为 true）时，发 `thinking: {type: "disabled"}`。
   - Claude Sonnet 5.5 发 disabled 会返回 400，但可以用 `thinking: {type: "between_tools"}` 关闭（effort 不超过 high，我们用 low）。
   - 关不掉的（Claude Opus 5.5、Fable）走默认的 adaptive。

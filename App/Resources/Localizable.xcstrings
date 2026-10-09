@@ -872,6 +872,16 @@
         }
       }
     },
+    "Using a relay for Claude or Gemini? If it supports their native API, choose Anthropic or Gemini here so web search works. Leave /v1 and /v1beta off the base URL.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过中转使用 Claude 或 Gemini？中转支持原生格式时，请在这里选 Anthropic 或 Gemini，这样才能联网。base URL 不要带 /v1 或 /v1beta。"
+          }
+        }
+      }
+    },
     "Web Search: Off": {
       "localizations": {
         "zh-Hans": {

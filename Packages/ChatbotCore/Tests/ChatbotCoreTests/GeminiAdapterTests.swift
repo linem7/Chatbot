@@ -381,6 +381,19 @@ struct GeminiAdapterTests {
         #expect(transport.requests.last?.url.absoluteString == "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&pageToken=p2")
         #expect(transport.requests.first?.headers["x-goog-api-key"] == "k")
     }
+
+    @Test func relayModelListInOpenAIStyleUsesTheBuiltInTable() async throws {
+        // 构造的响应：中转只返回 OpenAI 风格的列表，里面还混着别家的模型
+        let body = #"{"object":"list","data":[{"id":"gemini-2.5-flash","object":"model"},{"id":"claude-opus-5-5","object":"model"},{"id":"models/gemini-3.5-flash","object":"model"},{"id":"gemini-embedding-001","object":"model"}]}"#
+        let relay = Connection(name: "中转", provider: .gemini, baseURL: URL(string: "https://relay.example.com")!)
+        let transport = StubTransport(body: body)
+        let models = try await GeminiAdapter(transport: transport).listModels(relay, apiKey: "k")
+
+        #expect(models.map(\.id) == ["gemini-2.5-flash", "gemini-3.5-flash"])
+        #expect(models.allSatisfy { $0.capabilities == ModelCapabilities(imageInput: true, toolCalling: true, webSearch: true) })
+        #expect(transport.requests.first?.url.absoluteString == "https://relay.example.com/v1beta/models?pageSize=1000")
+        #expect(transport.requests.first?.headers["x-goog-api-key"] == "k")
+    }
 }
 
 private extension JSONValue {
