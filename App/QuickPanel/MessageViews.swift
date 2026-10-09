@@ -1,5 +1,6 @@
 import AppKit
 import ChatbotCore
+import ImageIO
 import MarkdownUI
 import SwiftUI
 
@@ -39,7 +40,7 @@ struct AttachmentChip: View {
 
     var body: some View {
         Group {
-            if let attachment, case .image(let data, _) = attachment.content, let image = NSImage(data: data) {
+            if let attachment, let image = ThumbnailCache.shared.thumbnail(for: attachment) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFill()
@@ -95,5 +96,33 @@ struct AssistantMessageView: View, Equatable {
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.markdown == rhs.markdown && lhs.isStreaming == rhs.isStreaming
+    }
+}
+
+/// 附件缩略图的缓存：按附件 id 缓存一张小图。
+/// 不缓存的话，流式生成时每个更新都会让气泡重绘，把长边 2000px 的原图重新解码一次。
+@MainActor
+final class ThumbnailCache {
+    static let shared = ThumbnailCache()
+
+    /// 缩略图显示成 44pt，按 2 倍屏取 88px，再留一点余量。
+    private static let maxPixelSize = 128
+    private let cache = NSCache<NSUUID, NSImage>()
+
+    func thumbnail(for attachment: Attachment) -> NSImage? {
+        guard case .image(let data, _) = attachment.content else { return nil }
+        let key = attachment.id as NSUUID
+        if let cached = cache.object(forKey: key) { return cached }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: Self.maxPixelSize,
+        ]
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
+        else { return nil }
+        let image = NSImage(cgImage: cgImage, size: NSSize(width: cgImage.width / 2, height: cgImage.height / 2))
+        cache.setObject(image, forKey: key)
+        return image
     }
 }
