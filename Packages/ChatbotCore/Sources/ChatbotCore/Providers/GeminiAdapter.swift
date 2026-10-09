@@ -84,6 +84,9 @@ public struct GeminiAdapter: ProviderAdapter {
         case "MAX_TOKENS": return .length
         case "SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII", "IMAGE_SAFETY", "LANGUAGE":
             throw ChatError.providerError("回答被 Gemini 的安全过滤拦截了（finishReason: \(raw)）")
+        // OTHER 是异常结束，回答可能不完整
+        case "OTHER":
+            throw ChatError.providerError("Gemini 异常结束了回答（finishReason: OTHER）")
         default:
             // STOP，以及没见过的值
             return .stop

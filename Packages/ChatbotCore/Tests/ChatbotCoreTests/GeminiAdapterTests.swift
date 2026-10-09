@@ -102,6 +102,13 @@ struct GeminiAdapterTests {
         }
     }
 
+    @Test func otherFinishReasonIsAProviderError() async throws {
+        // OTHER 表示异常结束，不能当成完整的回答
+        await #expect(throws: ChatError.providerError("Gemini 异常结束了回答（finishReason: OTHER）")) {
+            try await collect(StubTransport(body: chunk(parts: [text("Hi")], finishReason: "OTHER")))
+        }
+    }
+
     @Test func blockedPromptIsAProviderError() async throws {
         let body = "data: {\"promptFeedback\":{\"blockReason\":\"SAFETY\"}}\n\n"
         await #expect(throws: ChatError.providerError("问题被 Gemini 的安全过滤拦截了（blockReason: SAFETY）")) {
@@ -353,14 +360,18 @@ struct GeminiAdapterTests {
             return "{\"name\":\"models/\(name)\",\"displayName\":\"\(name)\",\"inputTokenLimit\":1048576,\"outputTokenLimit\":65536,\"supportedGenerationMethods\":[\(list)]}"
         }
         let page1 = "{\"models\":[\(model("gemini-2.5-flash")),\(model("text-embedding-004", methods: ["embedContent"])),\(model("gemini-2.5-flash-preview-tts"))],\"nextPageToken\":\"p2\"}"
-        let page2 = "{\"models\":[\(model("gemini-1.5-flash")),\(model("gemini-3.5-flash"))]}"
+        // -latest 是指向其他模型的别名，能力和思考档位都对不上内置表，不列出来
+        let page2 = "{\"models\":[\(model("gemini-1.5-flash")),\(model("gemini-3.5-flash")),\(model("gemini-flash-latest")),\(model("gemini-2.0-flash-lite")),\(model("gemini-2.0-flash"))]}"
         let transport = StubTransport(sequence: [
             .response(statusCode: 200, headers: [:], body: Array(page1.utf8)),
             .response(statusCode: 200, headers: [:], body: Array(page2.utf8)),
         ])
         let models = try await GeminiAdapter(transport: transport).listModels(.gemini(), apiKey: "k")
 
-        #expect(models.map(\.id) == ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash"])
+        #expect(models.map(\.id) == ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-3.5-flash", "gemini-2.0-flash-lite", "gemini-2.0-flash"])
+        // google_search 的支持表里有 2.0 Flash，没有 2.0 Flash-Lite（以前按前缀会误匹配）
+        #expect(models[3].capabilities.webSearch == false)
+        #expect(models[4].capabilities.webSearch == true)
         #expect(models[0].contextWindow == 1_048_576)
         #expect(models[0].maxOutputTokens == 65_536)
         #expect(models[0].capabilities == ModelCapabilities(imageInput: true, toolCalling: true, webSearch: true))

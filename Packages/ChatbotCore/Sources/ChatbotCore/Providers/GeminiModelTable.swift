@@ -34,7 +34,9 @@ enum GeminiModelTable {
 
     /// 支持 google_search 的模型（文档的支持表：2.0 Flash、2.5 全系、3.x 全系）。
     static func supportsWebSearch(_ modelID: String) -> Bool {
-        ["gemini-2.0-flash", "gemini-2.5-", "gemini-3"].contains { modelID.hasPrefix($0) }
+        // 支持表里有 2.0 Flash，没有 2.0 Flash-Lite，前缀相同，要单独排除
+        if modelID.hasPrefix("gemini-2.0-flash-lite") { return false }
+        return ["gemini-2.0-flash", "gemini-2.5-", "gemini-3"].contains { modelID.hasPrefix($0) }
     }
 
     /// 现役的 Gemini 聊天模型都能看图。
@@ -43,8 +45,9 @@ enum GeminiModelTable {
     }
 
     /// 不是聊天用的模型（嵌入、语音、生图、实时等），不出现在 Model 列表里。
+    /// `-latest` 是指向其他模型的别名，能力和思考档位对不上内置表，也不列出来。
     static func isChatModel(_ modelID: String) -> Bool {
-        let excluded = ["embedding", "tts", "image", "audio", "live", "robotics", "aqa", "imagen", "veo"]
+        let excluded = ["embedding", "tts", "image", "audio", "live", "robotics", "aqa", "imagen", "veo", "-latest"]
         return modelID.hasPrefix("gemini-") && !excluded.contains { modelID.contains($0) }
     }
 }
