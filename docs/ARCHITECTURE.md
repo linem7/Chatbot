@@ -11,7 +11,7 @@
 | UI | SwiftUI 为主；Quick Panel、Hotkey 等系统集成用 AppKit |
 | 工程 | XcodeGen：仓库里只提交 `project.yml`，`.xcodeproj` 加入 `.gitignore` |
 | 测试 | Swift Testing；`ChatbotCore` 可以用 `swift test` 单独运行 |
-| 依赖（SPM） | `sindresorhus/KeyboardShortcuts`、`groue/GRDB.swift`、`gonzalezreal/swift-markdown-ui`，另加一个代码高亮器（见 §8） |
+| 依赖（SPM） | App target：`sindresorhus/KeyboardShortcuts`（3.x）、`gonzalezreal/swift-markdown-ui`（2.4.1 起，product `MarkdownUI`）、`smittytone/HighlighterSwift`（3.1.0 起，product `Highlighter`，代码高亮）。ChatbotCore：`groue/GRDB.swift`（7.x）。MarkdownUI 已进入维护模式，后继是 Textual，暂不迁移（见 §8 第 1 条） |
 | 不引入 | 任何 LLM SDK、SSE 库、Sparkle 等更新框架 |
 | bundle id | `com.linem7.Chatbot` |
 | 签名 | 本机构建时用一张固定的自签名证书，不做公证（ADR-0005） |
@@ -156,7 +156,15 @@ message_fts(FTS5，索引 conversation.title 和 message.plainText)
 
 ## 8. 实现前需要核实的事
 
-1. **MarkdownUI 的维护状态和高亮器选择**：确认 `swift-markdown-ui` 当前是否仍在维护（作者可能已转向后继项目），以及它是否支持流式重绘时的性能。然后选一个代码高亮器（例如基于 highlight.js 的 HighlightSwift，或 Splash），确认两者能通过 MarkdownUI 的 `CodeSyntaxHighlighter` 接起来。
+1. **MarkdownUI 的维护状态和高亮器选择**（已核实，2026-10-09）：
+   - `swift-markdown-ui` 已进入维护模式（[作者 2025-12-28 的公告](https://github.com/gonzalezreal/swift-markdown-ui/discussions/437)），后继项目是 Textual。Textual 还是 0.x，流式渲染的问题较多，v1 继续用 MarkdownUI 2.4.1，暂不迁移。
+   - 代码高亮器选 `smittytone/HighlighterSwift`（Highlightr 的维护版，内置 highlight.js 11.11.1）。它提供同步 API `highlight(_:as:) -> NSAttributedString?`，可以直接实现 MarkdownUI 的同步协议 `CodeSyntaxHighlighter`。
+   - 接入要点（#19）：
+     - 深浅色各建一个 `Highlighter` 实例（例如 atom-one-light 和 atom-one-dark），按 `colorScheme` 选择；
+     - `Highlighter` 是非 Sendable 的 class，只在 MainActor 上使用；
+     - 按 (code, language, colorScheme) 缓存高亮结果；
+     - MarkdownUI 每次都整体重新解析，所以流式中的 Message 单独成为一个 view，只重绘最后一条；
+     - 2.4.1 的 `Theme` 不是 Sendable，Swift 6 下自定义主题可能报错。可以给自定义主题加 `@MainActor`，或者把依赖钉到 main 上「make the Theme type support Swift 6 (#351)」那个 commit。
 2. **Gemini**：
    - 哪些模型无法完全关闭思考；
    - 流中途出错时的格式；

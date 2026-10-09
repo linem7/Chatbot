@@ -19,6 +19,12 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     from: "3.1.0"
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    from: "2.4.1"
+  Highlighter:
+    url: https://github.com/smittytone/HighlighterSwift
+    from: "3.1.0"
 
 targets:
   Chatbot:
@@ -42,4 +48,6 @@ targets:
     dependencies:
       - package: ChatbotCore
       - package: KeyboardShortcuts
+      - package: MarkdownUI
+      - package: Highlighter
     scheme: {}

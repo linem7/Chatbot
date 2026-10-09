@@ -49,7 +49,7 @@
 
 - 原生 **Swift 6 + SwiftUI**（系统集成用 AppKit），最低支持 **macOS 26 Tahoe**
 - 用 XcodeGen 生成工程；核心逻辑放在本地 SPM 包 `ChatbotCore` 里，可以单独测试
-- 依赖：KeyboardShortcuts（全局快捷键）、GRDB（本地历史）、MarkdownUI（回答渲染）
+- 依赖：KeyboardShortcuts（全局快捷键）、GRDB（本地历史）、MarkdownUI（回答渲染）、HighlighterSwift（代码高亮）
 - 三家模型 API 都是基于 URLSession 自己实现的流式客户端，不使用任何 LLM SDK
 
 架构细节见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，关键决策见 [docs/adr/](docs/adr/)。
