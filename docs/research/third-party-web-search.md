@@ -7,7 +7,7 @@
 
 ## TL;DR
 
-1. **OpenRouter 能给 DeepSeek 联网，而且给的是标准的 `url_citation`**。推荐的开法是在 `tools` 里加 `{"type": "openrouter:web_search"}`（server tool，Beta），由模型决定搜不搜、搜几次。旧的 `plugins: [{id: "web"}]` 和模型名加 `:online` 已经标为 deprecated，它们每个请求固定搜一次。DeepSeek 没有原生搜索，所以 OpenRouter 改用 Exa：每次搜索 $0.007（最多 10 条结果），搜到的内容另按输入 token 计费。流式响应里，引用出现在 `choices[].delta.annotations[]`，类型是 `url_citation`，字段有 `url`、`title`、`content`、`start_index`、`end_index`。**偏移按什么单位算，官方没有写**；官方 SDK 把 `title` 和偏移都当成可选字段。
+1. **OpenRouter 能给 DeepSeek 联网，而且给的是标准的 `url_citation`**。推荐的开法是在 `tools` 里加 `{"type": "openrouter:web_search"}`（server tool，Beta），由模型决定搜不搜、搜几次。旧的 `plugins: [{id: "web"}]` 和模型名加 `:online` 已经标为 deprecated，它们每个请求固定搜一次。DeepSeek 没有原生搜索，所以 OpenRouter 改用 Exa：每次搜索 $0.007，含 10 条结果，超出部分每条 $0.001（`max_results` 最多 25），搜到的内容另按输入 token 计费。流式响应里，引用出现在 `choices[].delta.annotations[]`，类型是 `url_citation`，字段有 `url`、`title`、`content`、`start_index`、`end_index`。**偏移按什么单位算，官方没有写**；官方 SDK 把 `title` 和偏移都当成可选字段。
 2. **百炼的 OpenAI 兼容接口可以开联网，但不返回来源**。在请求体顶层加 `enable_search: true` 就能开，DeepSeek（deepseek-v4-pro / v4-flash / v3.2 等）在支持之列。但官方明确说 OpenAI 兼容 Chat Completions「不支持返回搜索来源和角标标注」，响应里连「这次有没有搜」都判断不出来。来源（`search_info.search_results`）和 `[1]`、`[ref_1]` 角标只有 DashScope 原生协议有。走 Responses API 的话，只返回 URL 列表，没有标题，也没有角标。计费：除了多出来的输入 token，北京地域默认的 turbo 策略每千次 3 元。
 3. **怎么判断平台和能力**：OpenRouter 的 host 是 `openrouter.ai`，百炼的 host 都在 `aliyuncs.com` 下（`dashscope*.aliyuncs.com` 和 `{WorkspaceId}.{region}.maas.aliyuncs.com`）。两家的 `/models` 都看不出「这个模型能不能联网」：
    - OpenRouter 的 server tool 对任何模型都能用（没有原生搜索的就退到 Exa）。
@@ -131,7 +131,7 @@ Plugin 的参数是 `engine`、`max_results`（默认 5）、`search_prompt`、`
 
 - 官方 base URL 是 `https://openrouter.ai/api/v1`（OpenAPI 的 `servers`）。
 - 地域端点 `us.openrouter.ai`、`eu.openrouter.ai`：`eu` 上没有任何搜索引擎，`us` 上只有 Exa（[server tool · Privacy and regional availability](https://openrouter.ai/docs/guides/features/server-tools/web-search)）。
-- 判断规则：host 是 `openrouter.ai`，或者以 `.openrouter.ai` 结尾。
+- 判断规则：host 是 `openrouter.ai`，或者以 `.openrouter.ai` 结尾。`eu.openrouter.ai` 仍然算 OpenRouter（关闭思考等字段照样要发），但**不支持联网**：EU 端点上没有任何搜索引擎可用。
 
 ### 1.8 用原生 Anthropic Messages 格式调 Claude（影响 #49）
 
@@ -255,7 +255,7 @@ Plugin 的参数是 `engine`、`max_results`（默认 5）、`search_prompt`、`
 
 - 请求参数：加 `{"type": "openrouter:web_search", "parameters": {"max_uses": 3}}`，跟 Anthropic 一样限 3 次。不过 `max_uses` 只对 Exa 这类非原生引擎和 Anthropic 原生搜索有效，其他原生引擎会忽略它。可以用 `max_tool_calls` 兜底。
 - 引用解析：从 `delta.annotations[]` 取 `url_citation`，映射成 `CitationSpan`。偏移单位要实测；如果不是 UTF-16，或者缺失，就退化成 `textRange: nil`（来源列表照样能显示）。
-- 能力判断：OpenRouter 的所有模型都当成支持 Web Search。地球按钮不再置灰，但要提示会额外收费。
+- 能力判断：OpenRouter 的所有模型都当成支持 Web Search，**host 是 `eu.openrouter.ai` 时除外**（§1.7，EU 端点没有搜索引擎）。地球按钮不再置灰，但要提示会额外收费。
 - 「正在搜索」状态：没有可靠信号，可以退化成「连接已建立、正文还没开始」时显示。`reasoning.server_tool_call` 能不能当信号，要实测。
 - ADR-0003：要修订，加一条「OpenRouter 用它的 server tool（第三方 Exa）」。这和 ADR 原来的「不接外部搜索服务」有冲突。Exa 由 OpenRouter 代调，用户不需要多管理一个 key，但多了一笔按次收的费用。
 
@@ -301,12 +301,14 @@ Plugin 的参数是 `engine`、`max_results`（默认 5）、`search_prompt`、`
    - `delta.annotations` 出现在哪个 chunk；
    - 有没有 `title`、`start_index`、`end_index`；
    - 在含中文和 emoji 的回答里，偏移是 UTF-16、码点还是字节；
+   - `end_index` 是闭区间还是半开区间：原文写的是「The index of the last character」，按字面是闭区间（指向最后一个字符），而 `CitationSpan.textRange` 是半开区间，换算时差 1；
    - 流里有没有 `reasoning_details` 的 server tool 记录；
    - `usage.server_tool_use.web_search_requests` 的值。
 2. 同一请求加上 `reasoning: {enabled: false}`，确认没有 `reasoning` 输出，搜索照常进行。
 3. 百炼北京 + `deepseek-v4-flash` + `enable_search: true` + `enable_thinking: false` 的流式响应原文：确认里面确实没有任何搜索来源字段，输入 token 明显变多（说明搜过）。
 4. 百炼上给 DeepSeek 发 `thinking: {type: "disabled"}` 会报错还是被忽略。
-5. OpenRouter `POST /api/v1/messages` + `anthropic/claude-*` + `web_search_20250305`：
+5. 百炼上 `deepseek-v4.1-flash` 到底支不支持联网：DeepSeek 模型页的表里写着支持，联网搜索页的模型清单里却没有它（§2.2）。
+6. OpenRouter `POST /api/v1/messages` + `anthropic/claude-*` + `web_search_20250305`：
    - 用 `x-api-key` 鉴权会不会被拒；
    - 流里的 `web_search_tool_result` 和 `citations_delta` 和 Anthropic 原生是否一致。
 
