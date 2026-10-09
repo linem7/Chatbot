@@ -178,7 +178,7 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
 
 `ContentBlock` 的种类：`text(String, citations)`、`attachmentRef(id)`、`toolCall`、`toolResult`、`webSearch(query)`、`opaque(provider, JSONValue)`。每个块都可以带 `providerData`。
 
-- **清理**：app 启动时执行一次，之后每 24 小时执行一次 `DELETE FROM conversation WHERE lastMessageAt < now - 30 days`，再删掉对应的附件目录。
+- **清理**：app 启动时执行一次，之后每 24 小时执行一次 `DELETE FROM conversation WHERE lastMessageAt < now - 30 days`，再删掉对应的附件目录。定时任务在 AppDelegate 里，调用 `HistoryStore.deleteExpiredConversations()`；删掉了东西就通知 Main Window 刷新。
 - **删除 Connection**：同时删除 `connectionID` 等于它的所有 Conversation。
 
 ## 6. Attachment 处理

@@ -17,6 +17,7 @@ public struct SSEEvent: Equatable, Sendable {
 /// 自己按字节切行，不用 `AsyncBytes.lines`：它会吞掉空行，而 SSE 靠空行分隔事件。
 /// 行尾可以是 `\n`、`\r` 或 `\r\n`，`\r\n` 被拆在两次 `push` 之间也能正确处理。
 /// 以 `:` 开头的注释行（例如 DeepSeek 的 `: keep-alive`）和未知字段都直接忽略。
+/// 流结束时，末尾没有以空行结束的事件按规范不派发，所以不需要额外的「结束」调用。
 /// https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation
 public struct SSEParser: Sendable {
     private var line: [UInt8] = []
@@ -51,13 +52,6 @@ public struct SSEParser: Sendable {
             }
         }
         return events
-    }
-
-    /// 流结束。规范规定：末尾没有以空行结束的事件不派发，所以总是返回空数组；
-    /// 保留这个方法，是为了让调用方明确地重置状态。
-    public mutating func finish() -> [SSEEvent] {
-        self = SSEParser()
-        return []
     }
 
     private mutating func endLine(into events: inout [SSEEvent]) {
