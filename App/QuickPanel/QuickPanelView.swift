@@ -64,9 +64,7 @@ private struct QuickPanelHeader: View {
         HStack(spacing: 8) {
             ModelPicker(store: store)
                 .frame(width: 190, alignment: .leading)
-            // 中间这块空当兼作拖动手柄（#63）
-            HeaderDragArea { store.hasMovedPanel = true }
-                .frame(maxWidth: .infinity)
+            Spacer(minLength: 0)
             Button {
                 store.togglePanelPinned()
             } label: {
@@ -108,6 +106,9 @@ private struct QuickPanelHeader: View {
                 .allowsHitTesting(false)
         }
         .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 10))
+        // 顶栏的空当兼作拖动手柄（#63）。放在 background 里：NSView 没有固有高度，直接塞进 HStack
+        // 会在竖直方向被拉伸，把顶栏撑得很高。按钮盖在上面照常接点按，点到空当才落到这里
+        .background { HeaderDragArea { store.hasMovedPanel = true } }
     }
 }
 
