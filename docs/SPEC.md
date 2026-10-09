@@ -20,7 +20,8 @@
 ### 2.1 Hotkey
 - 默认 **option+space**，可以在设置里修改。
 - 不需要任何系统权限。
-- 首次启动和改键时会检测冲突，如果和系统或其他 app 的快捷键冲突，会给出提示。注意 ChatGPT 桌面版默认也用 option+space。
+- 首次启动和改键时检测和**系统快捷键**的冲突，冲突时给出提示。
+- 和其他 app 的冲突检测不到（ChatGPT 桌面版默认也用 option+space），只在设置里 Hotkey 旁边放一句静态提示：按了没反应时，可能和 ChatGPT 等 app 冲突，请换一个组合。
 
 ### 2.2 外观（以 #15 原型的「聊天窗式」为准）
 原型：https://linem7.github.io/Chatbot/ （源在 `gh-pages` 分支）

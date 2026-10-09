@@ -41,6 +41,8 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: Chatbot
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+        SWIFT_EMIT_LOC_STRINGS: YES
         # 本机用固定的自签名证书签名（ADR-0005），创建步骤见 README。CI 不签名。
         CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: Chatbot Self-Signed
