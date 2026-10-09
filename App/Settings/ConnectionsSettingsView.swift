@@ -202,8 +202,9 @@ private struct ConnectionEditor: View {
                     LabeledContent("Provider") { Text(verbatim: draft.provider.displayName) }
                 }
                 TextField("Base URL", text: $draft.baseURL, prompt: Text(verbatim: "https://"))
-                if Platform(host: URL(string: draft.baseURL)?.host()) == .bailian {
-                    // 百炼按地域分端点，模板默认北京（#54）
+                // 百炼按地域分端点，模板默认北京（#54）；已经在新加坡端点上就不用提示了
+                if let region = Platform(host: URL(string: draft.baseURL)?.host())?.bailianRegion,
+                   region != .singapore {
                     Text("For the Singapore region, change the host to dashscope-intl.aliyuncs.com.")
                         .font(.caption)
                         .foregroundStyle(.secondary)

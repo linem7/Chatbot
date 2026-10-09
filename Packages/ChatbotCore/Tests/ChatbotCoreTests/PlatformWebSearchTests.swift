@@ -100,19 +100,68 @@ struct PlatformWebSearchTests {
 
     // MARK: 能力
 
-    @Test func everyModelOnASearchingPlatformCanSearch() {
+    @Test func openRouterGivesEveryModelServerSearch() {
         // #54 之前保存的 Connection：缓存的能力里没有搜索，也不用重新拉取
         let old = [ModelInfo(id: "deepseek/deepseek-v4.1-flash", capabilities: .conservative)]
         #expect(connection("https://openrouter.ai/api/v1", models: old).capabilities(ofModel: "deepseek/deepseek-v4.1-flash").webSearch)
         #expect(connection("https://openrouter.ai/api/v1").capabilities(ofModel: "any/model").webSearch)
         #expect(connection("https://us.openrouter.ai/api/v1").capabilities(ofModel: "any/model").webSearch)
-        #expect(connection("https://dashscope.aliyuncs.com/compatible-mode/v1").capabilities(ofModel: "deepseek-v4-flash").webSearch)
 
         #expect(!connection("https://eu.openrouter.ai/api/v1").capabilities(ofModel: "any/model").webSearch)
         #expect(!connection("https://api.deepseek.com").capabilities(ofModel: "deepseek-flash").webSearch)
         #expect(!connection("https://relay.example.com/v1").capabilities(ofModel: "gpt-x").webSearch)
         // 走 Anthropic 原生格式的 OpenRouter Connection 由 Anthropic adapter 自己判断，这里不改
         #expect(!connection("https://openrouter.ai/api", provider: .anthropic).capabilities(ofModel: "anthropic/claude").webSearch)
+    }
+
+    /// 百炼的清单按模型名和地域给（`BailianModelTable`，依据 research §2.2），不是「平台上的模型都能搜」。
+    @Test func bailianOnlyGivesServerSearchToTheModelsTheDocLists() {
+        let beijing = connection("https://dashscope.aliyuncs.com/compatible-mode/v1")
+        #expect(beijing.capabilities(ofModel: "deepseek-v4-flash").webSearch)
+        #expect(beijing.capabilities(ofModel: "deepseek-v3.2").webSearch)
+        #expect(beijing.capabilities(ofModel: "qwen3.8-max").webSearch)
+        #expect(beijing.capabilities(ofModel: "qwen-plus").webSearch)
+        // 用户实测的那一条：模型页写着支持，联网清单里没有它（§2.2 的「一个出入」），按钮要置灰
+        #expect(!beijing.capabilities(ofModel: "deepseek-v4.1-flash").webSearch)
+        // 表外的模型一律不支持
+        #expect(!beijing.capabilities(ofModel: "deepseek-v4.2-preview").webSearch)
+        // 要 search_strategy: agent 的 Omni 系列，只发 enable_search 搜不到
+        #expect(!beijing.capabilities(ofModel: "qwen3.5-omni-plus").webSearch)
+        // glm-5.2、kimi-k3 只能走 Responses API
+        #expect(!beijing.capabilities(ofModel: "glm-5.2").webSearch)
+        #expect(!beijing.capabilities(ofModel: "kimi-k3").webSearch)
+
+        // 新加坡少了 deepseek-v3.1、r1、v3，也没有 qwen-max/plus/flash/turbo
+        let singapore = connection("https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+        #expect(singapore.capabilities(ofModel: "deepseek-v4-flash").webSearch)
+        #expect(!singapore.capabilities(ofModel: "deepseek-v3.1").webSearch)
+        #expect(singapore.capabilities(ofModel: "qwen3-max").webSearch)
+        #expect(!singapore.capabilities(ofModel: "qwen-plus").webSearch)
+
+        // 全球地域（弗吉尼亚、香港、东京、法兰克福）一个第三方模型都没有
+        let global = connection("https://dashscope-us.aliyuncs.com/compatible-mode/v1")
+        #expect(!global.capabilities(ofModel: "deepseek-v4-flash").webSearch)
+        #expect(global.capabilities(ofModel: "qwen3.8-max").webSearch)
+    }
+
+    /// 文档「支持的模型」北京页里列的，逐条都得是能联网的——千问全系（含 qwen-max 系列的-日期快照、
+    /// Omni 之外的 3.x、角色扮演）和 DeepSeek 表内的模型都在其中。出问题的只是清单外的名字。
+    @Test(arguments: [
+        "qwen3.8-max", "qwen3.8-flash", "qwen3.8-2.4t-a95b", "qwen3.8-27b",
+        "qwen3.7-max", "qwen3.7-plus", "qwen3.7-flash",
+        "qwen3.6-plus", "qwen3.6-flash",
+        "qwen3.5-plus", "qwen3.5-flash",
+        "qwen3-max", "qwen3-max-2025-09-23",
+        "qwen-max", "qwen-plus", "qwen-plus-latest", "qwen-flash", "qwen-turbo",
+        "qwq-plus",
+        "qwen-plus-character", "qwen-flash-character",
+        "deepseek-v4-pro", "deepseek-v4-pro-0813", "deepseek-v4-flash", "deepseek-v4-flash-0731",
+        "deepseek-v3.2", "deepseek-v3.2-exp", "deepseek-v3.1",
+        "deepseek-r1-0528", "deepseek-r1", "deepseek-v3",
+        "Moonshot-Kimi-K2-Instruct", "MiniMax-M2.1",
+    ])
+    func beijingModelsListedByTheDocCanSearch(modelID: String) {
+        #expect(connection("https://dashscope.aliyuncs.com/compatible-mode/v1").capabilities(ofModel: modelID).webSearch)
     }
 
     @Test func openRouterModelListReportsImagesContextAndSearch() async throws {

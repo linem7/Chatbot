@@ -286,11 +286,12 @@ struct OpenAICompatibleAdapterTests {
         #expect(Platform(host: "openrouter.ai") == .openRouter(.global))
         #expect(Platform(host: "us.openrouter.ai") == .openRouter(.us))
         #expect(Platform(host: "eu.openrouter.ai") == .openRouter(.eu))
-        #expect(Platform(host: "dashscope.aliyuncs.com") == .bailian)
-        #expect(Platform(host: "dashscope-us.aliyuncs.com") == .bailian)
-        #expect(Platform(host: "cn-hongkong.dashscope.aliyuncs.com") == .bailian)
-        #expect(Platform(host: "trial.cn-beijing.maas.aliyuncs.com") == .bailian)
-        #expect(Platform(host: "LLM-X.AP-SOUTHEAST-1.MAAS.ALIYUNCS.COM") == .bailian)
+        #expect(Platform(host: "dashscope.aliyuncs.com") == .bailian(.beijing))
+        #expect(Platform(host: "dashscope-intl.aliyuncs.com") == .bailian(.singapore))
+        #expect(Platform(host: "dashscope-us.aliyuncs.com") == .bailian(.global))
+        #expect(Platform(host: "cn-hongkong.dashscope.aliyuncs.com") == .bailian(.global))
+        #expect(Platform(host: "trial.cn-beijing.maas.aliyuncs.com") == .bailian(.beijing))
+        #expect(Platform(host: "LLM-X.AP-SOUTHEAST-1.MAAS.ALIYUNCS.COM") == .bailian(.singapore))
         #expect(Platform(host: "oss-cn-beijing.aliyuncs.com") == nil)
         #expect(Platform(host: "notopenrouter.ai") == nil)
         #expect(Platform(host: "localhost") == nil)
@@ -302,7 +303,7 @@ struct OpenAICompatibleAdapterTests {
         #expect(Platform.openRouter(.global).supportsServerWebSearch)
         #expect(Platform.openRouter(.us).supportsServerWebSearch)
         #expect(Platform.openRouter(.eu).supportsServerWebSearch == false)
-        #expect(Platform.bailian.supportsServerWebSearch)
+        #expect(Platform.bailian(.beijing).supportsServerWebSearch)
     }
 
     @Test func euEndpointStillDisablesReasoning() async throws {

@@ -399,13 +399,18 @@ private struct ModelList: Decodable {
         }
 
         /// 图片能力看 `input_modalities`（DeepSeek 在顶层，OpenRouter 在 `architecture` 里），接口没报告时用保守默认。
-        /// tools 视为支持。搜索看平台：OpenRouter（EU 端点除外）和百炼的所有模型都能联网，其他不支持（ADR-0003）。
+        /// tools 视为支持。搜索看平台：OpenRouter（EU 端点除外）的引擎在平台侧，所有模型都能用；
+        /// 百炼按模型名和地域查表，不在表里的不支持（ADR-0003）。
         func modelInfo(platform: Platform?) -> ModelInfo {
             var capabilities = ModelCapabilities.conservative
             if let modalities = inputModalities ?? architecture?.inputModalities {
                 capabilities.imageInput = modalities.contains("image")
             }
-            capabilities.webSearch = platform?.supportsServerWebSearch ?? false
+            switch platform {
+            case .openRouter(let endpoint): capabilities.webSearch = endpoint != .eu
+            case .bailian(let region): capabilities.webSearch = BailianModelTable.supportsWebSearch(id, in: region)
+            case .deepSeek, .none: capabilities.webSearch = false
+            }
             let providerData: JSONValue? = reasoning.flatMap { $0 == .null ? nil : .object(["reasoning": $0]) }
             return ModelInfo(
                 id: id,

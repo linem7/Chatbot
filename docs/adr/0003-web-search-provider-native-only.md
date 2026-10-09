@@ -3,7 +3,7 @@
 > 2026-10-09 修订（#48、#54）：除了 Provider 的原生搜索，也使用 **Platform 自带的搜索**。OpenAI 兼容 Connection 如果在 OpenRouter 或阿里云百炼上，就能联网：
 > - **OpenRouter** 在 `tools` 里加 `{"type": "openrouter:web_search"}`，由模型决定搜不搜，引用从流里的 `annotations`（`url_citation`）取，正文里照常显示角标和来源列表。EU 端点（`eu.openrouter.ai`）上没有搜索引擎，不联网。
 > - **阿里云百炼**发 `enable_search: true`。它的 OpenAI 兼容接口不返回来源，所以没有角标、来源列表和「正在搜索」。
-> - 这两个平台上的所有 Model 都视为支持 Web Search（平台的搜索对任何模型都能用，`/models` 看不出来）。其他 OpenAI 兼容 Connection（DeepSeek 官方、OpenAI 官方、普通中转）仍然不联网。
+> - **不是这两个平台上的所有 Model 都能联网**。OpenRouter 的 `openrouter:web_search` 引擎在平台侧，任何 Model 都能用（EU 端点除外）；百炼的清单按模型名给，而且**分地域**（北京、新加坡、全球三张表差别很大，全球地域上一个 DeepSeek 都没有），按模型名和地域查 `BailianModelTable`，查不到就置灰。其他 OpenAI 兼容 Connection（DeepSeek 官方、OpenAI 官方、普通中转）仍然不联网。
 >
 > 这仍然是「服务端执行的搜索」，app 不调用任何外部搜索服务，和下面的原则一致：搜索由 Provider 或 Platform 在服务端执行。调研见 `docs/research/third-party-web-search.md`。
 

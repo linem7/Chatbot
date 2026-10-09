@@ -101,7 +101,7 @@
   - **OpenRouter** 的 `openrouter:web_search`（OpenAI 兼容 Connection，base URL 在 `openrouter.ai`；EU 端点除外）；
   - **阿里云百炼**的 `enable_search`（OpenAI 兼容 Connection，base URL 在 `dashscope*.aliyuncs.com` 或 `*.maas.aliyuncs.com`）；
   - 其他 OpenAI 兼容 Connection（**直连 DeepSeek 官方**、OpenAI 官方、普通中转）不支持搜索。
-- Platform 按 base URL 的 host 自动识别，已有的 Connection 不用重建。这两个 Platform 上的所有 Model 都视为支持搜索。
+- Platform 按 base URL 的 host 自动识别，已有的 Connection 不用重建。OpenRouter（EU 端点除外）上的所有 Model 都视为支持搜索；百炼只支持文档清单里的 Model，按模型名和地域查 `BailianModelTable`，不在表里的置灰。
 - 「是否支持 Web Search」是 Model Capabilities 的一项。
 - **默认开启**，由模型自己决定搜不搜。
 - 地球按钮可以对**当前 Conversation** 关闭搜索。Model 不支持搜索时，按钮置灰，悬停提示「当前模型不支持联网」。

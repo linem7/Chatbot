@@ -170,7 +170,8 @@ Plugin 的参数是 `engine`、`max_results`（默认 5）、`search_prompt`、`
 - **新加坡的 DeepSeek**：deepseek-v4-pro、deepseek-v4-pro-0813、deepseek-v4-flash、deepseek-v4-flash-0731、deepseek-v3.2。
 - **全球**部署范围（美国弗吉尼亚、中国香港、日本东京、德国法兰克福）：只有 qwen3.8-max、qwen3.8-max-0902、qwen3.8-flash、qwen3.8-omni-flash，**没有 DeepSeek**。
 - 千问方面，「2025 年 7 月后发布的千问 Max、千问 Plus、千问 Flash 模型都自动支持联网搜索」，另外 Qwen3.5 到 3.8 系列也支持。完整清单见原文。
-- 一个出入：[DeepSeek 模型页](https://help.aliyun.com/zh/model-studio/deepseek-api)的「其它功能」表里，**deepseek-v4.1-flash 标的是支持联网搜索**，但联网搜索页的清单里没有它。以哪边为准，要实测。
+- 一个出入：[DeepSeek 模型页](https://help.aliyun.com/zh/model-studio/deepseek-api)的「其它功能」表里，**deepseek-v4.1-flash 标的是支持联网搜索**，但联网搜索页的清单里没有它（2026-10-09 把联网搜索页全文 grep 过一遍，`v4.1` 一次都没出现）。实现上以**联网搜索页的清单**为准：`BailianModelTable` 只收清单里的模型，所以 v4.1-flash 的按钮是灰的。要实测出真结果再改这张表。
+- 清单里这两类模型本 app 用不了，实现时不收（`BailianModelTable`）：需要 `search_strategy: agent` 的千问 Omni、Omni-Realtime 系列（客户端只发 `enable_search`，策略走默认值，文档说这些模型必须设 agent 才会检索），以及只能走 Responses API 的 glm-5.2、kimi-k3（这里走 Chat Completions）。
 
 ### 2.3 计费
 
