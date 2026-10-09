@@ -6,6 +6,18 @@ struct QuickPanelView: View {
     @Bindable var store: ChatStore
     let composer: ComposerHandle
 
+    /// 最后一条回答中断或出错时，它下面的操作按钮（SPEC §7）。
+    private var lastAnswerActions: AnswerActionHandler? {
+        guard store.lastAnswerNeedsAction else { return nil }
+        return AnswerActionHandler { [store] action in
+            switch action {
+            case .openSettings: store.openSettingsForCurrentConnection()
+            case .retry: store.retry()
+            case .newConversation: store.newConversation()
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             QuickPanelHeader(store: store)
@@ -13,9 +25,15 @@ struct QuickPanelView: View {
             if store.hasConnection {
                 Group {
                     if store.messages.isEmpty {
-                        EmptyConversationView(notice: store.notice)
+                        EmptyConversationView(notice: store.notice, openSettings: store.openSettingsForCurrentConnection)
                     } else {
-                        MessageList(messages: store.messages, attachments: store.attachmentsByID, notice: store.notice)
+                        MessageList(
+                            messages: store.messages,
+                            attachments: store.attachmentsByID,
+                            lastAnswerActions: lastAnswerActions,
+                            notice: store.notice,
+                            openSettings: store.openSettingsForCurrentConnection
+                        )
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -115,13 +133,27 @@ private struct ModelPicker: View {
 
 private struct EmptyConversationView: View {
     let notice: String?
+    let openSettings: @MainActor () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
             Text("What can I help with?")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundStyle(.secondary)
-            if let notice { NoticeText(text: notice) }
+            if let notice { SendNotice(text: notice, openSettings: openSettings) }
+        }
+    }
+}
+
+/// 发送前的问题（目前都和 API key 有关），旁边给「打开设置」。
+private struct SendNotice: View {
+    let text: String
+    let openSettings: @MainActor () -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            NoticeText(text: text)
+            AnswerActionButton(action: .openSettings, isPrimary: true) { openSettings() }
         }
     }
 }
@@ -131,15 +163,22 @@ private struct MessageList: View {
     let messages: [Message]
     /// 已经发出的附件，用户消息按 `attachmentRef` 查这里显示。
     let attachments: [UUID: Attachment]
+    /// 只给最后一条回答。
+    let lastAnswerActions: AnswerActionHandler?
     let notice: String?
+    let openSettings: @MainActor () -> Void
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(messages) { message in
-                    MessageRow(message: message, attachments: message.attachmentIDs.compactMap { attachments[$0] })
+                    MessageRow(
+                        message: message,
+                        attachments: message.attachmentIDs.compactMap { attachments[$0] },
+                        actions: message.id == messages.last?.id ? lastAnswerActions : nil
+                    )
                 }
-                if let notice { NoticeText(text: notice) }
+                if let notice { SendNotice(text: notice, openSettings: openSettings) }
             }
             .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16))
         }

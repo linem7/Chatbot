@@ -66,9 +66,11 @@ struct ConnectionsSettingsView: View {
         }
         .onAppear {
             applyPendingTemplate()
+            applyPendingConnection()
             if selection == nil, draft == nil { selection = connections.connections.first?.id }
         }
         .onChange(of: navigation.pendingTemplate) { applyPendingTemplate() }
+        .onChange(of: navigation.pendingConnectionID) { applyPendingConnection() }
         .onChange(of: selection) { loadDraft(for: selection) }
     }
 
@@ -85,13 +87,22 @@ struct ConnectionsSettingsView: View {
         startNew(from: template)
     }
 
+    /// 从回答旁边的「打开设置」过来：选中那个对话用的 Connection。
+    private func applyPendingConnection() {
+        guard let connectionID = navigation.pendingConnectionID else { return }
+        navigation.pendingConnectionID = nil
+        if connections.connection(id: connectionID) != nil { selection = connectionID }
+    }
+
     private func loadDraft(for id: UUID?) {
         guard let id else {
             draft = nil
             return
         }
         if draft?.id == id { return }
-        draft = connections.connection(id: id).map(ConnectionDraft.init(connection:))
+        draft = connections.connection(id: id).map {
+            ConnectionDraft(connection: $0, manualModelIDs: connections.manualModelIDs(of: $0.id))
+        }
     }
 }
 
@@ -104,6 +115,8 @@ struct ConnectionDraft {
     var apiKey = ""
     var models: [ModelInfo]
     var hiddenModelIDs: Set<String>
+    /// 用户手动填写的模型 ID，重新拉取时保留。
+    var manualModelIDs: [String]
     /// 还没保存过。
     var isNew: Bool
     let allowsChoosingProvider: Bool
@@ -116,17 +129,19 @@ struct ConnectionDraft {
         baseURL = template == .custom ? "" : connection.baseURL.absoluteString
         models = []
         hiddenModelIDs = []
+        manualModelIDs = []
         isNew = true
         allowsChoosingProvider = template.allowsChoosingProvider
     }
 
-    init(connection: Connection) {
+    init(connection: Connection, manualModelIDs: [String]) {
         id = connection.id
         name = connection.name
         provider = connection.provider
         baseURL = connection.baseURL.absoluteString
         models = connection.models
         hiddenModelIDs = connection.hiddenModelIDs
+        self.manualModelIDs = manualModelIDs
         isNew = false
         allowsChoosingProvider = false
     }
@@ -162,10 +177,8 @@ private struct ConnectionEditor: View {
     @State private var canSaveWithoutTesting = false
     @State private var manualModelID = ""
     @State private var isConfirmingDelete = false
-
-    private var hasSavedKey: Bool {
-        !draft.isNew && ((try? chat.apiKeys.apiKey(for: draft.id)) ?? nil) != nil
-    }
+    /// Keychain 里是否已经有这个 Connection 的 key。出现时读一次，保存新 key 后更新，不在每次重绘时查 Keychain。
+    @State private var hasSavedKey = false
 
     var body: some View {
         Form {
@@ -215,15 +228,27 @@ private struct ConnectionEditor: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(draft.models) { model in
-                    Toggle(isOn: visibility(of: model.id)) {
-                        HStack(spacing: 6) {
-                            Text(verbatim: model.displayName ?? model.id)
-                            if model.capabilities.imageInput {
-                                Image(systemName: "photo").foregroundStyle(.secondary).help("Accepts images")
+                    HStack {
+                        Toggle(isOn: visibility(of: model.id)) {
+                            HStack(spacing: 6) {
+                                Text(verbatim: model.displayName ?? model.id)
+                                if model.capabilities.imageInput {
+                                    Image(systemName: "photo").foregroundStyle(.secondary).help("Accepts images")
+                                }
+                                if model.capabilities.webSearch {
+                                    Image(systemName: "globe").foregroundStyle(.secondary).help("Can search the web")
+                                }
                             }
-                            if model.capabilities.webSearch {
-                                Image(systemName: "globe").foregroundStyle(.secondary).help("Can search the web")
+                        }
+                        // 只有手动填写的可以删掉；拉取到的用勾选来隐藏
+                        if draft.manualModelIDs.contains(model.id) {
+                            Button {
+                                removeManualModel(model.id)
+                            } label: {
+                                Image(systemName: "minus.circle")
                             }
+                            .buttonStyle(.borderless)
+                            .help("Remove")
                         }
                     }
                 }
@@ -241,6 +266,9 @@ private struct ConnectionEditor: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear {
+            hasSavedKey = !draft.isNew && ((try? chat.apiKeys.apiKey(for: draft.id)) ?? nil) != nil
+        }
         .confirmationDialog(
             Text("Delete “\(draft.name)”?"),
             isPresented: $isConfirmingDelete
@@ -263,12 +291,28 @@ private struct ConnectionEditor: View {
         }
     }
 
-    /// 拉取失败时手动填写模型 ID（SPEC §9）。能力用保守默认，用户不能手动改能力。
+    /// 手动填写模型 ID（SPEC §9）：拉取失败时，或者 `/models` 返回的列表不全时用。
+    /// 能力用保守默认，用户不能手动改能力。已经保存过的 Connection 立即生效。
     private func addManualModel() {
         let id = manualModelID.trimmingCharacters(in: .whitespaces)
         manualModelID = ""
         guard !draft.models.contains(where: { $0.id == id }) else { return }
         draft.models.append(ModelInfo(id: id, capabilities: .conservative))
+        draft.manualModelIDs.append(id)
+        persistModelsIfSaved()
+    }
+
+    private func removeManualModel(_ id: String) {
+        draft.models.removeAll { $0.id == id }
+        draft.manualModelIDs.removeAll { $0 == id }
+        persistModelsIfSaved()
+    }
+
+    private func persistModelsIfSaved() {
+        guard !draft.isNew, var stored = chat.connections.connection(id: draft.id) else { return }
+        stored.models = draft.models
+        chat.connections.save(stored)
+        chat.connections.setManualModelIDs(draft.manualModelIDs, of: draft.id)
     }
 
     /// 保存时拉取 Model 列表，这一步同时就是连接测试；成功才写进 Keychain（SPEC §9）。
@@ -287,9 +331,14 @@ private struct ConnectionEditor: View {
 
         isSaving = true
         defer { isSaving = false }
+        var manualModelIDs = draft.manualModelIDs
         if testing {
             do {
-                connection.models = try await connection.provider.makeAdapter().listModels(connection, apiKey: key)
+                let fetched = try await connection.provider.makeAdapter().listModels(connection, apiKey: key)
+                // 拉取结果加上手动填写、而列表里没有的模型；手动填的 ID 这次拉到了，就不再算手动的
+                let fetchedIDs = Set(fetched.map(\.id))
+                manualModelIDs.removeAll { fetchedIDs.contains($0) }
+                connection.models = fetched + draft.models.filter { manualModelIDs.contains($0.id) }
             } catch {
                 errorMessage = (error as? ChatError)?.displayText ?? error.localizedDescription
                 canSaveWithoutTesting = true
@@ -305,9 +354,11 @@ private struct ConnectionEditor: View {
             }
         }
         chat.connections.save(connection)
+        chat.connections.setManualModelIDs(manualModelIDs, of: connection.id)
         chat.connectionsDidChange()
         canSaveWithoutTesting = false
-        draft = ConnectionDraft(connection: connection)
+        if !newKey.isEmpty { hasSavedKey = true }
+        draft = ConnectionDraft(connection: connection, manualModelIDs: manualModelIDs)
         onSaved(connection.id)
     }
 

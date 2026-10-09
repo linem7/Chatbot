@@ -17,6 +17,8 @@ final class SettingsNavigation {
     var tab: SettingsTab = .general
     /// Connection 页出现时，用这个模板新建一个草稿，然后清空。
     var pendingTemplate: ConnectionTemplate?
+    /// Connection 页出现时选中这个 Connection，然后清空（错误旁边的「打开设置」）。
+    var pendingConnectionID: UUID?
     /// 这次是不是第一次启动 app。
     let isFirstLaunch: Bool
     @ObservationIgnored private var didShowFirstLaunchSettings = false
@@ -29,6 +31,11 @@ final class SettingsNavigation {
     func showConnections(template: ConnectionTemplate? = nil) {
         tab = .connections
         pendingTemplate = template
+    }
+
+    func showConnection(_ connectionID: UUID) {
+        tab = .connections
+        pendingConnectionID = connectionID
     }
 
     /// 首次启动时只自动打开一次设置。返回 true 表示这次需要打开。

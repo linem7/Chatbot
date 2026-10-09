@@ -14,6 +14,7 @@ struct ModelRef: Codable, Hashable {
 final class ConnectionStore {
     private static let connectionsKey = "connections"
     private static let defaultModelKey = "defaultModel"
+    private static let manualModelIDsKey = "manualModelIDs"
 
     private let defaults: UserDefaults
     private(set) var connections: [Connection]
@@ -21,10 +22,24 @@ final class ConnectionStore {
         didSet { Self.write(defaultModel, forKey: Self.defaultModelKey, to: defaults) }
     }
 
+    /// 每个 Connection 里用户手动填写的模型 ID（key 是 Connection ID）。重新拉取 Model 列表时保留它们，
+    /// 免得 `/models` 返回的列表不全时用户补的 ID 被冲掉。
+    private var manualModelIDs: [String: [String]]
+
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         connections = Self.read([Connection].self, forKey: Self.connectionsKey, from: defaults) ?? []
         defaultModel = Self.read(ModelRef.self, forKey: Self.defaultModelKey, from: defaults)
+        manualModelIDs = Self.read([String: [String]].self, forKey: Self.manualModelIDsKey, from: defaults) ?? [:]
+    }
+
+    func manualModelIDs(of connectionID: UUID) -> [String] {
+        manualModelIDs[connectionID.uuidString] ?? []
+    }
+
+    func setManualModelIDs(_ ids: [String], of connectionID: UUID) {
+        manualModelIDs[connectionID.uuidString] = ids.isEmpty ? nil : ids
+        Self.write(manualModelIDs, forKey: Self.manualModelIDsKey, to: defaults)
     }
 
     func connection(id: UUID) -> Connection? {
@@ -49,6 +64,7 @@ final class ConnectionStore {
     func delete(_ connectionID: UUID) {
         connections.removeAll { $0.id == connectionID }
         Self.write(connections, forKey: Self.connectionsKey, to: defaults)
+        setManualModelIDs([], of: connectionID)
         if defaultModel?.connectionID == connectionID { defaultModel = nil }
     }
 
