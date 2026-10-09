@@ -34,7 +34,7 @@ jobs:
             -project Chatbot.xcodeproj \
             -scheme Chatbot \
             -configuration Debug \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             -skipPackagePluginValidation \
             -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \

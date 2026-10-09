@@ -90,7 +90,8 @@ API key 存在钥匙串里，钥匙串按签名身份判断访问权限。所以
 xcodegen generate                    # 由 project.yml 生成 Chatbot.xcodeproj
 xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Release \
   -derivedDataPath build build
-cp -R build/Build/Products/Release/Chatbot.app /Applications/
+rm -rf /Applications/Chatbot.app      # 先删掉旧版本，避免旧 bundle 里多出的文件让签名失效
+ditto build/Build/Products/Release/Chatbot.app /Applications/Chatbot.app
 ```
 
 也可以 `open Chatbot.xcodeproj` 后在 Xcode 里构建运行。app 只出现在菜单栏，不出现在 Dock。改了 `project.yml` 或增删了源文件后，要重新执行 `xcodegen generate`。
