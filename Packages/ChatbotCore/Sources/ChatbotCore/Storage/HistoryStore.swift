@@ -54,6 +54,7 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
     }
 
     public func attachments(in conversationID: UUID) async throws -> [Attachment] {
+        // 在闭包里就转换成 Sendable 的值：Row 不是 Sendable，返回 Row 会让编译器选中阻塞的同步 read
         let rows = try await database.read { db in
             try Row.fetchAll(
                 db,
@@ -64,25 +65,25 @@ public final class HistoryStore: MessageStore, TitleStore, Sendable {
                     ORDER BY message.seq, attachment.rowid
                     """,
                 arguments: [conversationID.uuidString]
-            )
+            ).map { row in
+                (id: row["id"] as String, kind: row["kind"] as String, originalName: row["originalName"] as String, storedFile: row["storedFile"] as String)
+            }
         }
         let folder = attachmentsDirectory.appendingPathComponent(conversationID.uuidString, isDirectory: true)
         return rows.compactMap { row in
-            let storedFile: String = row["storedFile"]
-            let kindValue: String = row["kind"]
-            guard let id = UUID(uuidString: row["id"]),
-                  let kind = Attachment.Kind(rawValue: kindValue),
+            guard let id = UUID(uuidString: row.id),
+                  let kind = Attachment.Kind(rawValue: row.kind),
                   // 副本文件丢了就略过这个附件
-                  let data = try? Data(contentsOf: folder.appendingPathComponent(storedFile))
+                  let data = try? Data(contentsOf: folder.appendingPathComponent(row.storedFile))
             else { return nil }
             let content: Attachment.Content
             switch kind {
             case .image:
-                content = .image(data, mediaType: storedFile.hasSuffix(".png") ? "image/png" : "image/jpeg")
+                content = .image(data, mediaType: row.storedFile.hasSuffix(".png") ? "image/png" : "image/jpeg")
             case .pdf, .text:
                 content = .text(String(decoding: data, as: UTF8.self))
             }
-            return Attachment(id: id, kind: kind, originalName: row["originalName"], content: content)
+            return Attachment(id: id, kind: kind, originalName: row.originalName, content: content)
         }
     }
 
