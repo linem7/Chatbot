@@ -21,10 +21,11 @@
 - #13（设置）已关闭：key 存 Keychain，设置是独立窗口，分三个标签页；去掉了「手动覆盖 Model Capabilities」（修改了 #7 的结论，已在 #7 补充说明）；界面做中英文，跟随系统。
 - #14（工程基线）已关闭：最低支持 macOS 26；工程用 XcodeGen 生成；分层是 App target 加本地 SPM 包 ChatbotCore；用自签名证书签名、不做公证（ADR-0005）；CI 负责构建、测试和按 tag 发布；更新只做「有新版本」提示；日志只用 os.Logger；Swift 6 + Swift Testing；bundle id 是 com.linem7.Chatbot。
 - #15（Quick Panel 原型）已关闭：用户选了 **B · 聊天窗式**（固定高度、顶部是模型选择器和标题、消息用气泡、输入框在底部）。原型在 `prototype/quick-panel` 分支上，不进 main。
-- 下一个 ticket 是 #16（汇总写 SPEC.md、ARCHITECTURE.md，更新 README）。#1 里还剩三项 Not yet specified：Markdown 渲染、上下文截断、错误提示方式。
-- 仓库在 2026-10-09 应用户要求改成了 **public**。GitHub Pages 从 `prototype/quick-panel` 分支发布：https://linem7.github.io/Chatbot/
+- #1 里剩下的三项 Not yet specified 已经定了（结论记在 #16 的评论里）：Markdown 用完整 GFM 加代码高亮，用 MarkdownUI 渲染；不截断上下文，超长时提示新开对话；错误显示在回答里并给出下一步；回答上悬停时显示「复制」。
+- 下一个 ticket 是 #16（汇总写 SPEC.md、ARCHITECTURE.md，更新 README），这是规划阶段的最后一步。
+- 仓库在 2026-10-09 曾短暂改成 public 来开 GitHub Pages，同一天又应用户要求改回了 **private**。免费账号的私有仓库没有 Pages，原来的 Pages 链接已经失效。
 
 ## 偏好补充
 
-- 给用户看的网页、原型，**直接部署到 GitHub Pages 并给出可以点开的链接**。不要让用户下载文件或切分支再看。
+- 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。仓库是私有的，所以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ）。修改仓库可见性前要先问用户。
 - **当前这台机器是 Linux**，没法构建和运行 Swift/macOS app。用户在 Mac 上开发，CI 用 macOS runner。在这里只能写代码、写文档，要说明代码没有经过编译验证。
