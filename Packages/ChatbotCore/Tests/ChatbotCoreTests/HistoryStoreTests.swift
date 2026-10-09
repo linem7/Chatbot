@@ -311,6 +311,53 @@ struct HistoryStoreTests {
         #expect(saved.last?.markdownText == "一半")
     }
 
+    @Test func retryOverwritesTheOldAnswerInTheRealStore() async throws {
+        let store = try openStore()
+        let conversation = conversation()
+        let firstSavedAt = Date(timeIntervalSince1970: 1_000)
+        let question = Message(role: .user, content: [ContentBlock(.text("天气怎么样"))], createdAt: firstSavedAt)
+        let oldAnswer = Message(
+            role: .assistant,
+            status: .failed(.overloaded),
+            content: [
+                ContentBlock(.opaque(provider: .anthropic, .object(["type": .string("server_tool_use")]))),
+                ContentBlock(.text("老旧答案文本")),
+            ],
+            createdAt: firstSavedAt
+        )
+        try await store.saveUserMessage(question, in: conversation)
+        try await store.saveAssistantMessage(oldAnswer, conversationID: conversation.id)
+
+        // Retry：同一条用户 Message，新回答沿用旧回答的 id
+        let adapter = ScriptedAdapter([[.event(.textDelta("全新回答内容")), .event(.finished(.stop))]])
+        let input = TurnInput(
+            conversation: conversation,
+            connection: .deepSeek(),
+            apiKey: "sk-test",
+            systemPrompt: "",
+            history: [],
+            userMessage: question,
+            replacingAnswerID: oldAnswer.id
+        )
+        for await _ in TurnRunner(store: store, makeAdapter: { _ in adapter }).run(input).updates {}
+
+        let saved = try await openStore().messages(in: conversation.id)
+        // 顺序（seq）不变，没有多出一条
+        #expect(saved.map(\.id) == [question.id, oldAnswer.id])
+        let answer = try #require(saved.last)
+        #expect(answer.status == .complete)
+        // createdAt 保留第一次保存时的值
+        #expect(answer.createdAt == firstSavedAt)
+        // 旧回答的 opaque 块也被清掉了
+        #expect(answer.content == [ContentBlock(.text("全新回答内容"))])
+
+        // 全文索引跟着更新：MATCH（3 个字及以上）和 LIKE（2 个字）两条路径
+        #expect(try await store.search("全新回答").map(\.id) == [conversation.id])
+        #expect(try await store.search("老旧答案").isEmpty)
+        #expect(try await store.search("全新").map(\.id) == [conversation.id])
+        #expect(try await store.search("老旧").isEmpty)
+    }
+
     private func makeAttachmentDirectory(for conversationID: UUID) throws -> URL {
         let url = directory.appendingPathComponent("attachments/\(conversationID.uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
