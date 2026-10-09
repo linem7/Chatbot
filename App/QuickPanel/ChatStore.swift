@@ -248,7 +248,7 @@ final class ChatStore {
         historyRevision += 1
     }
 
-    /// 地球按钮：只对当前 Conversation 开关 Web Search，默认开启（SPEC §5）。
+    /// 地球按钮：只对当前 Conversation 开关 Web Search，新 Conversation 的初始状态由设置决定，默认关（SPEC §5）。
     /// 持久化：已经落库的 Conversation 立刻更新；还没落库的，第一次保存用户 Message 时会把这个字段一起写进去。
     func setWebSearchEnabled(_ enabled: Bool) {
         guard var conversation, conversation.webSearchEnabled != enabled else { return }
@@ -270,7 +270,8 @@ final class ChatStore {
 
     private func makeConversation(model: ModelRef? = nil) -> Conversation? {
         guard let model = model ?? connections.defaultModel ?? firstAvailableModel() else { return nil }
-        return Conversation(connectionID: model.connectionID, modelID: model.modelID)
+        // 新 Conversation 默认不联网，除非用户在设置里改成默认开（SPEC §5、#68）
+        return Conversation(connectionID: model.connectionID, modelID: model.modelID, webSearchEnabled: WebSearchDefault.isOn())
     }
 
     private func firstAvailableModel() -> ModelRef? {

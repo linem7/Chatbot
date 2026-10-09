@@ -47,9 +47,9 @@ extension ChatStore {
         currentModelCapabilities?.webSearch ?? false
     }
 
-    /// 地球按钮现在是不是开着：Model 支持搜索，并且这个 Conversation 没有关掉。
+    /// 地球按钮现在是不是开着：Model 支持搜索，并且这个 Conversation 打开了搜索。
     var isWebSearchOn: Bool {
-        currentModelSupportsWebSearch && (conversation?.webSearchEnabled ?? true)
+        currentModelSupportsWebSearch && (conversation?.webSearchEnabled ?? false)
     }
 
     private var currentModelCapabilities: ModelCapabilities? {

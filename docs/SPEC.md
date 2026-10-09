@@ -110,8 +110,8 @@
   - 其他 OpenAI 兼容 Connection（**直连 DeepSeek 官方**、OpenAI 官方、普通中转）不支持搜索。
 - Platform 按 base URL 的 host 自动识别，已有的 Connection 不用重建。OpenRouter（EU 端点除外）上的所有 Model 都视为支持搜索；百炼只支持文档清单里的 Model，按模型名和地域查 `BailianModelTable`，不在表里的置灰。
 - 「是否支持 Web Search」是 Model Capabilities 的一项。
-- **默认开启**，由模型自己决定搜不搜。
-- 地球按钮可以对**当前 Conversation** 关闭搜索。Model 不支持搜索时，按钮置灰，悬停提示「当前模型不支持联网」。
+- **默认关闭**（#68）：新 Conversation 不联网，需要时点地球按钮对**当前 Conversation** 打开，打开后由模型自己决定搜不搜。设置里可以改成新 Conversation 默认开启（§9）。已保存的 Conversation 保持各自的状态。
+- 地球按钮可以对**当前 Conversation** 打开或关闭搜索。Model 不支持搜索时，按钮置灰，悬停提示「当前模型不支持联网」。
 - 每次 Turn 最多搜索 3 次。这个上限只对 Anthropic 有效，Gemini 无法限制。
 - 显示方式：
   - 搜索中显示「正在搜索：关键词」，正文开始输出后，变成一行灰字「搜索了：A、B」。OpenRouter 和百炼的流里没有可靠的搜索事件，不显示这一行。
@@ -165,6 +165,7 @@
 **通用**
 - Hotkey 改键（附带冲突检测）
 - Default Model
+- 新对话默认联网（默认关，见 §5）
 - 开机启动（默认开启）
 
 **Connection**

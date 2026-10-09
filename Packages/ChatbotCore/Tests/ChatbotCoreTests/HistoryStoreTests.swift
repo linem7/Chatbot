@@ -102,10 +102,10 @@ struct HistoryStoreTests {
         let store = try openStore()
         let conversation = conversation()
         try await store.saveUserMessage(.user("q"), in: conversation)
-        #expect(try await store.conversation(conversation.id)?.webSearchEnabled == true)
+        #expect(try await store.conversation(conversation.id)?.webSearchEnabled == false)
 
-        try await store.saveWebSearchEnabled(false, conversationID: conversation.id)
-        #expect(try await openStore().conversation(conversation.id)?.webSearchEnabled == false)
+        try await store.saveWebSearchEnabled(true, conversationID: conversation.id)
+        #expect(try await openStore().conversation(conversation.id)?.webSearchEnabled == true)
     }
 
     @Test func webSearchSwitchForAnUnsavedConversationIsANoOp() async throws {

@@ -33,6 +33,7 @@ private struct GeneralSettingsView: View {
     @Bindable var connections: ConnectionStore
     let launchAtLogin: LaunchAtLogin
     let hotkey: HotkeyController
+    @AppStorage(WebSearchDefault.defaultsKey) private var webSearchOnByDefault = false
 
     var body: some View {
         Form {
@@ -75,6 +76,11 @@ private struct GeneralSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+                // 新对话默认不联网（SPEC §5、#68）
+                Toggle("Search the Web in New Conversations", isOn: $webSearchOnByDefault)
+                Text("Only for models that can search. The globe button still turns it on or off for the current conversation.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
