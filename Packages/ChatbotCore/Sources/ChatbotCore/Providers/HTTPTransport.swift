@@ -88,12 +88,10 @@ public struct URLSessionTransport: HTTPTransport {
             if let name = name as? String, let value = value as? String { headers[name] = value }
         }
 
-        // AsyncBytes 不是 Sendable。交给下面的 Task 之后，这里不再使用它，所以只有一个读者。
-        nonisolated(unsafe) let handedOffBytes = bytes
         let body = AsyncThrowingStream<UInt8, any Error> { continuation in
             let task = Task {
                 do {
-                    for try await byte in handedOffBytes { continuation.yield(byte) }
+                    for try await byte in bytes { continuation.yield(byte) }
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: Self.map(error))
