@@ -1,0 +1,53 @@
+# XcodeGen 工程描述。生成：`xcodegen generate`。生成的 Chatbot.xcodeproj 不提交。
+name: Chatbot
+
+options:
+  bundleIdPrefix: com.linem7
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+packages:
+  ChatbotCore:
+    path: Packages/ChatbotCore
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    from: "3.1.0"
+  MarkdownUI:
+    url: https://github.com/gonzalezreal/swift-markdown-ui
+    from: "2.4.1"
+  Highlighter:
+    url: https://github.com/smittytone/HighlighterSwift
+    from: "3.1.0"
+
+targets:
+  Chatbot:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+        excludes:
+          - "**/.gitkeep"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.linem7.Chatbot
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Chatbot
+        INFOPLIST_KEY_LSUIElement: YES
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
+        # 本机用固定的自签名证书签名（ADR-0005），创建步骤见 README。CI 不签名。
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: Chatbot Self-Signed
+        DEVELOPMENT_TEAM: ""
+    dependencies:
+      - package: ChatbotCore
+      - package: KeyboardShortcuts
+      - package: MarkdownUI
+      - package: Highlighter
+    scheme: {}
