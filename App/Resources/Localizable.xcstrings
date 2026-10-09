@@ -31,6 +31,16 @@
         }
       }
     },
+    "Add Files…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加附件…"
+          }
+        }
+      }
+    },
     "Ask anything": {
       "localizations": {
         "zh-Hans": {
@@ -67,6 +77,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法从钥匙串读取 API key。"
+          }
+        }
+      }
+    },
+    "Couldn't read “%@”.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取「%@」。"
           }
         }
       }
@@ -151,6 +171,16 @@
         }
       }
     },
+    "Pasted Image": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴的图片"
+          }
+        }
+      }
+    },
     "Pressing it won't open the Quick Panel. Turn off that shortcut in System Settings › Keyboard › Keyboard Shortcuts, or choose another Hotkey in Chatbot's settings.": {
       "localizations": {
         "zh-Hans": {
@@ -167,6 +197,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "退出 Chatbot"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
           }
         }
       }
@@ -227,6 +267,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "API key 无效或已过期。"
+          }
+        }
+      }
+    },
+    "The current model can't accept images.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前模型不能接受图片。"
           }
         }
       }
@@ -297,6 +347,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "sk-…"
+          }
+        }
+      }
+    },
+    "“%@” has no text to extract. It may be a scanned PDF.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%@」里没有可以抽取的文字，可能是扫描版 PDF。"
+          }
+        }
+      }
+    },
+    "“%@” isn't a supported file type.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持「%@」这种文件类型。"
           }
         }
       }

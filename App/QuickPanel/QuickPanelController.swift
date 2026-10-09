@@ -19,6 +19,8 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     private let panel: QuickPanel
     private var isShown = false
     private var keyMonitor: Any?
+    /// 文件面板打开期间，Quick Panel 会失焦，但不应该隐藏。
+    private var isPresentingFilePicker = false
 
     init(store: ChatStore) {
         self.store = store
@@ -40,6 +42,7 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
         panel.hasShadow = true
         panel.delegate = self
         panel.contentView = makeContentView()
+        store.presentFilePicker = { [weak self] in self?.presentFilePicker() }
     }
 
     func toggle() {
@@ -67,7 +70,31 @@ final class QuickPanelController: NSObject, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
+        guard !isPresentingFilePicker else { return }
         hide()
+    }
+
+    // MARK: - 「+」添加附件
+
+    /// 打开文件面板选附件（SPEC §4）。
+    ///
+    /// Quick Panel 是不激活 app 的面板，app 本身不在前台，文件面板可能出现在别的 app 的窗口后面。
+    /// 所以打开前先激活 app 兜底；关闭后让 Quick Panel 重新成为 key window，焦点回到输入框。
+    private func presentFilePicker() {
+        guard isShown, !isPresentingFilePicker else { return }
+        isPresentingFilePicker = true
+        defer {
+            isPresentingFilePicker = false
+            panel.makeKeyAndOrderFront(nil)
+            composer.focus()
+        }
+        NSApp.activate()
+        let openPanel = NSOpenPanel()
+        openPanel.allowsMultipleSelection = true
+        openPanel.canChooseDirectories = false
+        openPanel.canChooseFiles = true
+        guard openPanel.runModal() == .OK else { return }
+        store.addAttachments(fromFiles: openPanel.urls)
     }
 
     // MARK: - 布局

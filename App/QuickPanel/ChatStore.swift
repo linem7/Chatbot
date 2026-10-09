@@ -16,6 +16,12 @@ final class ChatStore {
     private let runner: TurnRunner
 
     var draft = ""
+    /// 输入区待发送的附件（「+」、粘贴、拖放）。和草稿文字一样，新开对话时不清空。
+    var draftAttachments: [DraftAttachment] = []
+    /// 加入附件失败时的提示（AttachmentError），显示在输入区上方；和发送时的 `notice` 分开。
+    var attachmentNotice: String?
+    /// 已经发出的附件，消息气泡按 `attachmentRef` 查这里显示。
+    var attachmentsByID: [UUID: Attachment] = [:]
     private(set) var conversation: Conversation?
     private(set) var messages: [Message] = []
     private(set) var hasUnread = false
@@ -34,6 +40,8 @@ final class ChatStore {
 
     /// 由菜单栏的视图注入：在 SwiftUI 场景之外打开设置窗口。
     @ObservationIgnored var openSettings: @MainActor () -> Void = {}
+    /// 由 QuickPanelController 注入：「+」打开文件面板（面板失焦时不隐藏 Quick Panel）。
+    @ObservationIgnored var presentFilePicker: @MainActor () -> Void = {}
 
     init(connections: ConnectionStore = ConnectionStore(), apiKeys: APIKeyStore = APIKeyStore()) {
         self.connections = connections
@@ -46,8 +54,11 @@ final class ChatStore {
 
     var hasConnection: Bool { !connections.connections.isEmpty }
 
+    /// 有文字或者有这次能发出去的附件才能发送。只有图片、而当前 Model 不接受图片时不能发送；
+    /// 附件还在处理时也先不发（SPEC §4）。
     var canSend: Bool {
-        !isGenerating && conversation != nil && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasText = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return !isGenerating && conversation != nil && !isProcessingAttachments && (hasText || hasSendableAttachments)
     }
 
     var title: String { conversation?.title ?? "" }
@@ -145,10 +156,14 @@ final class ChatStore {
         }
 
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let userMessage = Message.user(text)
+        let attachments = takeDraftAttachments()
+        rememberAttachments(attachments)
+        let userMessage = Message.user(text, attachments: attachments)
         if conversation.title.isEmpty {
-            // 标题生成在 #20 里做，之前先用第一条用户消息的第一行（SPEC §8）
-            conversation.title = text.prefix(while: { !$0.isNewline }).trimmingCharacters(in: .whitespaces)
+            // 标题生成在 #20 里做，之前先用第一条用户消息的第一行（SPEC §8）；只有附件时用第一个附件的文件名
+            conversation.title = text.isEmpty
+                ? attachments.first?.originalName ?? ""
+                : text.prefix(while: { !$0.isNewline }).trimmingCharacters(in: .whitespaces)
         }
         conversation.lastMessageAt = userMessage.createdAt
         self.conversation = conversation
@@ -165,7 +180,8 @@ final class ChatStore {
             apiKey: apiKey,
             systemPrompt: SystemPrompt.default(),
             history: history,
-            userMessage: userMessage
+            userMessage: userMessage,
+            attachments: attachments
         ))
         self.turn = turn
         Task { await consume(turn, conversationID: conversation.id) }

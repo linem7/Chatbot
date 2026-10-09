@@ -15,7 +15,7 @@ struct QuickPanelView: View {
                     if store.messages.isEmpty {
                         EmptyConversationView(notice: store.notice)
                     } else {
-                        MessageList(messages: store.messages, notice: store.notice)
+                        MessageList(messages: store.messages, attachments: store.attachmentsByID, notice: store.notice)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -27,6 +27,13 @@ struct QuickPanelView: View {
                     .controlSize(.large)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        // 文件拖到面板任何地方都作为附件（拖到输入框上的由 ComposerNSTextView 处理）
+        .dropDestination(for: URL.self) { urls, _ in
+            let files = urls.filter(\.isFileURL)
+            guard store.hasConnection, !files.isEmpty else { return false }
+            store.addAttachments(fromFiles: files)
+            return true
         }
     }
 }
@@ -113,13 +120,15 @@ private struct EmptyConversationView: View {
 /// 消息列表。内容增长时保持贴在底部。
 private struct MessageList: View {
     let messages: [Message]
+    /// 已经发出的附件，用户消息按 `attachmentRef` 查这里显示。
+    let attachments: [UUID: Attachment]
     let notice: String?
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(messages) { message in
-                    MessageRow(message: message)
+                    MessageRow(message: message, attachments: message.attachmentIDs.compactMap { attachments[$0] })
                 }
                 if let notice { NoticeText(text: notice) }
             }
@@ -132,11 +141,12 @@ private struct MessageList: View {
 
 private struct MessageRow: View {
     let message: Message
+    let attachments: [Attachment]
 
     var body: some View {
         switch message.role {
         case .user:
-            UserMessageBubble(text: message.markdownText)
+            UserMessageBubble(text: message.markdownText, attachments: attachments)
         case .assistant:
             VStack(alignment: .leading, spacing: 6) {
                 if message.status == .streaming && message.content.isEmpty {
@@ -190,6 +200,14 @@ private struct ComposerView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            if let notice = store.attachmentNotice ?? store.imageNotAcceptedWarning {
+                Text(verbatim: notice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.orange)
+            }
+            if !store.draftAttachments.isEmpty {
+                DraftAttachmentStrip(attachments: store.draftAttachments, remove: store.removeDraftAttachment(id:))
+            }
             ZStack(alignment: .topLeading) {
                 if store.draft.isEmpty {
                     Text("Ask anything")
@@ -197,12 +215,26 @@ private struct ComposerView: View {
                         .foregroundStyle(.tertiary)
                         .allowsHitTesting(false)
                 }
-                ComposerTextView(text: $store.draft, contentHeight: $contentHeight, handle: composer) {
-                    store.send()
-                }
+                ComposerTextView(
+                    text: $store.draft,
+                    contentHeight: $contentHeight,
+                    handle: composer,
+                    onSubmit: { store.send() },
+                    onAttachFiles: { store.addAttachments(fromFiles: $0) },
+                    onAttachImage: { store.addAttachment(imageData: $0) }
+                )
                 .frame(height: min(max(contentHeight, Self.lineHeight), Self.maxHeight))
             }
             HStack(spacing: 8) {
+                Button {
+                    store.presentFilePicker()
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 26, height: 26)
+                }
+                .buttonStyle(.borderless)
+                .help("Add Files…")
                 Spacer(minLength: 0)
                 Text("⏎ Send · ⇧⏎ New Line")
                     .font(.system(size: 11.5))
@@ -234,5 +266,35 @@ private struct SendButton: View {
         .buttonStyle(.plain)
         .disabled(!isGenerating && !canSend)
         .help(isGenerating ? LocalizedStringKey("Stop (⌘.)") : "Send (⏎)")
+    }
+}
+
+/// 输入区上方的附件缩略图条：图片显示缩略图，文件显示图标和文件名，每个都有 × 可以删除（SPEC §2.2）。
+private struct DraftAttachmentStrip: View {
+    let attachments: [DraftAttachment]
+    let remove: (UUID) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(attachments) { draft in
+                    AttachmentChip(name: draft.name, attachment: draft.attachment)
+                        .overlay(alignment: .topTrailing) {
+                            Button {
+                                remove(draft.id)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .symbolRenderingMode(.palette)
+                                    .foregroundStyle(.white, .black.opacity(0.6))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Remove")
+                            .offset(x: 5, y: -5)
+                        }
+                }
+            }
+            .padding(.top, 6)
+            .padding(.trailing, 6)
+        }
     }
 }

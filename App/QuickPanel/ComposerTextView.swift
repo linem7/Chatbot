@@ -18,15 +18,49 @@ final class ComposerHandle {
     }
 }
 
-/// 输入框用的 NSTextView。进入窗口时，补上之前没做成的聚焦。
+/// 输入框用的 NSTextView。
+///
+/// - 进入窗口时，补上之前没做成的聚焦（#33）。
+/// - 粘贴和拖放时先看是不是附件（SPEC §4）：
+///   - 剪贴板里有文件（Finder 里复制的文件）→ 附件；
+///   - 有文字 → 照常粘贴文字（从网页复制的图文混排也按文字处理）；
+///   - 只有图片数据（截图工具复制的图片）→ 附件。
 final class ComposerNSTextView: NSTextView {
     weak var handle: ComposerHandle?
+    var onAttachFiles: (([URL]) -> Void)?
+    var onAttachImage: ((Data) -> Void)?
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         guard let window, let handle, handle.pendingFocus else { return }
         handle.pendingFocus = false
         window.makeFirstResponder(self)
+    }
+
+    override func paste(_ sender: Any?) {
+        let pasteboard = NSPasteboard.general
+        if let urls = Self.fileURLs(in: pasteboard), !urls.isEmpty {
+            onAttachFiles?(urls)
+            return
+        }
+        if pasteboard.string(forType: .string) == nil, let image = pasteboard.data(forType: .png) ?? pasteboard.data(forType: .tiff) {
+            onAttachImage?(image)
+            return
+        }
+        super.paste(sender)
+    }
+
+    /// 文件拖到输入框上时作为附件，不插入文件路径。拖到面板其他地方的由 SwiftUI 的 dropDestination 处理。
+    override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
+        if let urls = Self.fileURLs(in: sender.draggingPasteboard), !urls.isEmpty {
+            onAttachFiles?(urls)
+            return true
+        }
+        return super.performDragOperation(sender)
+    }
+
+    private static func fileURLs(in pasteboard: NSPasteboard) -> [URL]? {
+        pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]
     }
 }
 
@@ -39,6 +73,10 @@ struct ComposerTextView: NSViewRepresentable {
     @Binding var contentHeight: CGFloat
     let handle: ComposerHandle
     let onSubmit: () -> Void
+    /// 粘贴或拖进来的文件（Finder 里复制的文件、拖到输入框上的文件）。
+    var onAttachFiles: ([URL]) -> Void = { _ in }
+    /// 粘贴的图片数据（截图工具复制的图片）。
+    var onAttachImage: (Data) -> Void = { _ in }
 
     static let font = NSFont.systemFont(ofSize: 14)
 
@@ -50,6 +88,9 @@ struct ComposerTextView: NSViewRepresentable {
         let textView = ComposerNSTextView(usingTextLayoutManager: false)
         textView.handle = handle
         textView.delegate = context.coordinator
+        let coordinator = context.coordinator
+        textView.onAttachFiles = { [weak coordinator] in coordinator?.parent.onAttachFiles($0) }
+        textView.onAttachImage = { [weak coordinator] in coordinator?.parent.onAttachImage($0) }
         textView.isRichText = false
         textView.importsGraphics = false
         textView.allowsUndo = true
