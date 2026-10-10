@@ -72,3 +72,9 @@
   - 装 app 用 `./scripts/install.sh`。
 - **网络**：GitHub、Apple 的 CDN 直连不通（curl 15 秒超时、0 字节），命令行工具（git、gh、xcodebuild 拉包）要挂代理，例如 `export https_proxy=http://127.0.0.1:8118 http_proxy=http://127.0.0.1:8118`，详见记忆 `github-needs-local-proxy`。**不要**改全局 git 代理配置（用户没同意过）。`xcodebuild` 尤其要注意：SPM 解析依赖时会在 `DerivedData/.../SourcePackages/checkouts/` 里 `git clone` 各个包，不挂代理就**卡在那里不动**（不是报错，是一直等），看起来像编译慢。构建前记得 export 代理。
 - 更早的会话在另一台 Linux 机器上跑（swiftly 装 Swift 6.3.3、GRDB 要解 libsqlite3-dev、没有 `URLSession.bytes(for:)`）。那些说明在 Mac 上都不适用：这台没有 `~/.local/share/swiftly`。
+
+## 协作约定（2026-10-10）
+
+- 用户要求将 `CLAUDE.md` 的项目说明复制到标准文件名 `AGENTS.md`，Codex 后续直接读取 `AGENTS.md`。
+- 用户通常在本机测试，合并和发布无需等待 GitHub CI；如实说明本地验证情况即可。
+- **v1.0.2 已发布为 GitHub Latest Release**：PR #71 已合并、#70 已关闭、#1 已记录结论；发布标签对应 `3900495`，Apple Silicon ZIP 和 SHA-256 文件已上传，安装包版本、架构、签名及上传摘要已核验。
