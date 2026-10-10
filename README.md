@@ -4,9 +4,9 @@
 
 ## 下载与安装
 
-**v1.0.1：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
+**v1.0.2：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
 
-[下载 v1.0.1 安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.1/Chatbot-1.0.1-macOS-arm64.zip) · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Chatbot/releases)
+[下载 v1.0.2 安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.2/Chatbot-1.0.2-macOS-arm64.zip) · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Chatbot/releases)
 
 解压后把 `Chatbot.app` 拖进 **Applications**。首次打开如被拦截，进入 **System Settings › Privacy & Security › Open Anyway**。应用采用自签名、未经过 Apple 公证；使用时需要自己的 API key。无需安装 Xcode 或创建证书。
 
@@ -186,7 +186,7 @@ CI（`.github/workflows/ci.yml`）在 push 到 main 和 PR 时执行同样的生
 
 ## 项目状态
 
-v1.0.1 通过 GitHub Release 分发。相对 v1.0.0 的改动只有一项：联网搜索改为默认关闭，设置里可以改成新对话默认联网。规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+v1.0.2 通过 GitHub Release 分发。相对 v1.0.1，修复百炼视觉模型被误判为不支持图片输入的问题，已有 Connection 无需重新配置。规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## Roadmap
 
@@ -201,3 +201,4 @@ v1.0.1 通过 GitHub Release 分发。相对 v1.0.0 的改动只有一项：联�
 - [x] v1 功能及真机反馈修复
 - [x] v1.0.0：GitHub Release 安装包和安装指引
 - [x] v1.0.1：联网默认关闭，设置里可改成新对话默认开启
+- [x] v1.0.2：修复百炼视觉模型的图片输入能力判断

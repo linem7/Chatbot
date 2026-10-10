@@ -10,7 +10,7 @@
 - grilling 等需要用户做选择的提问，**用 AskUserQuestion 工具来问**（2026-10-09 用户明确要求），推荐项放在第一个并标「（推荐）」。不要在聊天里直接列出编号问题。
 - 用户的 macOS 是**英文系统**（2026-10-09 真机验证时发现）。README 等文档里提到 macOS 的 app、菜单、设置位置、系统弹窗，以及 Chatbot 自己的界面文字时，一律写英文原文（例如 Keychain Access、System Settings › Privacy & Security、Settings 的 General 页、Launch at Login），正文仍然用中文。app 的界面文字以 `App/Resources/Localizable.xcstrings` 的英文 key 为准。
 
-## 进度和待办（截至 2026-10-09）
+## 进度和待办（截至 2026-10-10）
 
 - #2–#6 五个研究 ticket 已关闭，研究文档都在 main 的 `docs/research/` 下。远程的 `research/*` 分支已于 2026-10-09 删除，相关链接已改为指向 main。
 - #7（Provider 抽象）已关闭，产出 `CONTEXT.md`、`docs/adr/0001`、`docs/adr/0002`。
@@ -61,7 +61,7 @@
 - 2026-10-10：本地 `main` 已跟到 `27bca41`（「发布 v1.0.0：安装包脚本与安装指引」，另一个会话推的：新增 `docs/INSTALL.md`、`docs/releases/v1.0.0.md`、`scripts/package-release.sh`，版本号改成 1.0.0，并把「v1 只自用、不发 Release」的决定改成发布给朋友手动安装）。
 - 2026-10-10：#68（Web Search 默认关闭）完成，PR #69 已合（用户真机测过）。决策（用户已确认）：每个新 Conversation 都从关开始、不记住上一次；Settings › General 加「新对话默认联网」开关（默认关）。
 - 2026-10-10：发布 **v1.0.1**（版本号由用户指定）。相对 v1.0.0 只有 #68 一项改动：联网搜索默认关闭 + 「新对话默认联网」开关。动了 `project.yml` 的 MARKETING_VERSION、README 和 `docs/INSTALL.md` 的版本号与下载链接、SPEC §11（改成不写死版本号），新增 `docs/releases/v1.0.1.md`；用 `scripts/package-release.sh` 打包，ZIP 和 .sha256 传到 GitHub Release。
-- 2026-10-10：#70（百炼上能看图的模型被判为不能接收图片）修复在 PR #71，**待用户真机验证后合并**。原因是百炼 `compatible-mode/v1/models` 不报告 `input_modalities`；修法是 `BailianModelTable.acceptsImages` 按模型名查表（不分地域），调研在 `docs/research/bailian-vision-models.md`。合并后要在 #70 评论结论并关闭。
+- 2026-10-10：#70 已解决，PR #71 已合并。用户在 Mac 上安装修复分支后确认百炼 `qwen3.8-max` 图片输入正常，验证结论已记入 PR 和 issue。修法是 `BailianModelTable.acceptsImages` 按模型名查表，并在运行时补上已保存 Connection 的图片能力；调研在 `docs/research/bailian-vision-models.md`。用户要求以 **v1.0.2** 发布，沿用本机固定自签名、Apple Silicon ZIP 和 SHA-256 校验文件。
 
 ## 偏好补充
 
