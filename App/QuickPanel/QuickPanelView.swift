@@ -230,6 +230,7 @@ private struct MessageList: View {
     @State private var viewportHeight: CGFloat = 0
 
     private static let spacing: CGFloat = 14
+    private static let questionTopInset: CGFloat = 20
     private static let padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
     private static let anchoredTurnID = "anchoredTurn"
 
@@ -251,6 +252,8 @@ private struct MessageList: View {
                             ForEach(messages[split...]) { row($0) }
                             if let notice { SendNotice(text: notice, openSettings: openSettings) }
                         }
+                        // 留白放进滚动目标内部，scrollTo(.top) 后气泡才不会紧贴消息区上沿。
+                        .padding(.top, anchorIndex == nil ? 0 : Self.questionTopInset)
                         .frame(
                             minHeight: anchorIndex == nil ? 0 : max(0, viewportHeight - Self.padding.bottom),
                             alignment: .top
@@ -258,7 +261,13 @@ private struct MessageList: View {
                         .id(Self.anchoredTurnID)
                     }
                 }
-                .padding(Self.padding)
+                .padding(EdgeInsets(
+                    // 首轮的留白已经包含在滚动目标内，避免首次显示时叠加两份。
+                    top: anchorIndex == 0 ? 0 : Self.padding.top,
+                    leading: Self.padding.leading,
+                    bottom: Self.padding.bottom,
+                    trailing: Self.padding.trailing
+                ))
             }
             // 首轮发送才创建 MessageList，此时也必须从问题开头显示；只有装回历史时才从底部显示。
             .defaultScrollAnchor(anchorIndex == nil ? .bottom : .top)

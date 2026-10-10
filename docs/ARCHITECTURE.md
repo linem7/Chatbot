@@ -215,6 +215,7 @@ message_fts(FTS5，trigram 分词，和 message.plainText 同步)
   - `level = .floating`，`collectionBehavior` 包括 `.canJoinAllSpaces`、`.fullScreenAuxiliary`、`.transient`、`.ignoresCycle`；
   - 内容用 `NSHostingView`；
   - 消息区：`ChatStore.anchoredQuestion` 记录发送或 Retry 对应的用户 Message，`MessageList` 将这一轮撑到至少一个视口高，再滚到问题开头；流式生成时保持上沿，不跟随到底部。首轮发送才创建消息列表，所以初始滚动锚点也按是否有问题定位选择顶部或底部，定位监听使用 `initial: true`；装回历史时没有问题定位，仍从底部显示（#72、#74）。
+    - 问题上方的 20pt 留白放在这一轮的滚动目标内部，并计入最小高度；首轮移除列表外层的顶部 padding，保证首轮、后续轮次和 Retry 的定位间距一致（#75）。
   - 在 `windowDidResignKey` 中执行 `orderOut`；面板被固定住时（顶栏图钉，#59）`hide()` 直接返回，失焦、Esc、Hotkey 都不再收起，窗口就留在 `.floating` 层级上——「保持在最前」靠的是已有的层级，固定状态只是不再自己 `orderOut`。守卫只放在 `hide()` 这一处，三种收起方式都从它经过；
   - 面板内的快捷键用本地 `NSEvent` monitor 按 keyCode 处理：Esc 隐藏面板，⌘. 停止生成，⌘N 新对话。不用 `.onExitCommand`，因为 AppKit 把 Esc 和 ⌘. 都映射为 `cancelOperation:`，没法区分；输入法正在组字时 Esc 交给输入法；
   - 定位：按鼠标所在的屏幕，偏上居中。顶栏的空当包一个 `NSViewRepresentable`，在 `mouseDown` 里调 `NSWindow.performDrag(with:)` 拖动窗口（#63）——无边框窗口没有标题栏，系统不给拖。`isMovable` 为 true 配合 `performDrag`，`isMovableByWindowBackground` 保持 false，消息区选字才不会被当成拖窗口。拖过一次后 `ChatStore.hasMovedPanel` 置位，之后 `show()` 不再重新定位；这一位和 `isPanelPinned` 一样不写进设置，重启回到偏上居中。
