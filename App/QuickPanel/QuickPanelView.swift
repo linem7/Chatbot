@@ -260,13 +260,14 @@ private struct MessageList: View {
                 }
                 .padding(Self.padding)
             }
-            .defaultScrollAnchor(.bottom)
+            // 首轮发送才创建 MessageList，此时也必须从问题开头显示；只有装回历史时才从底部显示。
+            .defaultScrollAnchor(anchorIndex == nil ? .bottom : .top)
             // 有顶上去的问题时，内容变高保持上沿不动，不跟着回答滚到底
             .defaultScrollAnchor(anchorIndex == nil ? .bottom : .top, for: .sizeChanges)
             .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
                 viewportHeight = height
             }
-            .onChange(of: anchoredQuestion) { _, anchoredQuestion in
+            .onChange(of: anchoredQuestion, initial: true) { _, anchoredQuestion in
                 guard anchoredQuestion != nil else { return }
                 // 等新消息和留白排好版再滚
                 Task { @MainActor in
