@@ -66,7 +66,7 @@
 ## 偏好补充
 
 - 给用户看的网页、原型，要给出**能直接点开的链接**，不要让用户下载文件或切分支再看。可以用 Claude Artifact 发布（Quick Panel 原型：https://claude.ai/artifact/91wkjCMTEVn2hBE36hZEJH ），也可以在征得用户同意后用 GitHub Pages。修改仓库可见性前要先问用户。
-- **当前这台机器就是用户的 Mac**（2026-10-09 起；`Chaopais-Mac-mini.local`，arm64，macOS 27.0，Apple Swift 6.4）。Xcode 27.0 装在 `/Applications/Xcode-27.0.0.app`（**版本号带后缀**，不是 `/Applications/Xcode.app`），`xcode-select` 已指过去。可以直接构建和跑测试，改动能本地验证，不用只靠 CI：
+- **用户在两个地方办公**（2026-10-10 说明）：有时在 Linux（`srv1915303`）上写代码，测试时回到 Mac 上自己构建、验证。在 Linux 上改完推分支即可，**不需要等 GitHub CI 来检验**，用户会在 Mac 上测。用户的 Mac 是 `Chaopais-Mac-mini.local`（2026-10-09 起；`Chaopais-Mac-mini.local`，arm64，macOS 27.0，Apple Swift 6.4）。Xcode 27.0 装在 `/Applications/Xcode-27.0.0.app`（**版本号带后缀**，不是 `/Applications/Xcode.app`），`xcode-select` 已指过去。可以直接构建和跑测试，改动能本地验证，不用只靠 CI：
   - `xcodebuild -project Chatbot.xcodeproj -scheme Chatbot -configuration Debug -derivedDataPath build build`
   - `swift test --package-path Packages/ChatbotCore`
   - 装 app 用 `./scripts/install.sh`。
@@ -78,3 +78,4 @@
 - 用户要求将 `CLAUDE.md` 的项目说明复制到标准文件名 `AGENTS.md`，Codex 后续直接读取 `AGENTS.md`。
 - 用户通常在本机测试，合并和发布无需等待 GitHub CI；如实说明本地验证情况即可。
 - **v1.0.2 已发布为 GitHub Latest Release**：PR #71 已合并、#70 已关闭、#1 已记录结论；发布标签对应 `3900495`，Apple Silicon ZIP 和 SHA-256 文件已上传，安装包版本、架构、签名及上传摘要已核验。
+- 2026-10-10：#72（Quick Panel 发出问题后顶到消息区最上面、回答生成时不跟着滚到底）在 PR #73。决策（用户已确认）：问题顶到最上面，回答短时下面留白；Retry 也一样；打开 / 装回已有 Conversation 时仍停在底部；Main Window 不动。在 Linux 上写的，没有编译过，**待用户在 Mac 上验证**后再合并、关 issue、记入 #1。
