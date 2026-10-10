@@ -89,6 +89,9 @@ extension Connection {
     /// OpenAI 兼容 Connection 在能联网的平台上按平台规则判断 Web Search（ADR-0003）：`/models` 看不出这个能力，
     /// 所以不依赖缓存的值，#54 之前保存的 Connection 也不用重新拉取。
     /// OpenRouter 的引擎在平台侧、对任何 Model 都能用；百炼只支持文档列出的 Model，按模型名和地域查表。
+    ///
+    /// 百炼的图片能力也在这里按模型名查表补上（#70）：#70 之前保存的百炼 Model 全是保守默认，
+    /// 缓存里分不出「接口说不支持」和「接口没报告」，所以和缓存的值取并集，老 Connection 不用重新拉取。
     public func capabilities(ofModel modelID: String) -> ModelCapabilities {
         var capabilities = models.first { $0.id == modelID }?.capabilities ?? .conservative
         guard provider == .openAICompatible, let platform else { return capabilities }
@@ -97,6 +100,7 @@ extension Connection {
             capabilities.webSearch = endpoint != .eu
         case .bailian(let region):
             capabilities.webSearch = BailianModelTable.supportsWebSearch(modelID, in: region)
+            capabilities.imageInput = capabilities.imageInput || BailianModelTable.acceptsImages(modelID)
         case .deepSeek:
             break
         }

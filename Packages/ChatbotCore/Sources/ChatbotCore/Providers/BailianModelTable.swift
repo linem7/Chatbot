@@ -1,4 +1,4 @@
-/// 百炼（DashScope）能用平台联网搜索的模型表。
+/// 百炼（DashScope）的模型能力表：能用平台联网搜索的模型，和能接收图片的模型（`acceptsImages`）。
 ///
 /// 百炼的联网不是「这个平台上的模型都能用」：清单按**模型名**给，而且**分地域**——
 /// 北京、新加坡、全球三张表差别很大（全球地域上一个 DeepSeek 都没有）。`/models` 里看不出这个能力，
@@ -22,6 +22,48 @@ enum BailianModelTable {
         var names: Set<String> = []
         var prefixes: [String] = []
     }
+
+    /// 能不能接收图片输入。百炼的 OpenAI 兼容 `/models` 没有文档说会报告 `input_modalities`，
+    /// 只能按模型名查表，查不到就是不支持（保守默认，#70）。
+    ///
+    /// 依据：各模型详情页「模型能力」里的输入模态（2026-10-10 抓取，整理见
+    /// `docs/research/bailian-vision-models.md`）。同一个模型的输入模态不分地域，只是上架的地域不同，
+    /// 所以这张表不带地域。百炼上新模型时按模型详情页更新。
+    ///
+    /// 同一个系列里有的型号能看图、有的不能，所以前缀写到具体型号：
+    /// - `qwen3.7-max` 是纯文本，只有 `qwen3.7-max-2026-06-08` 这一个快照加了视觉，写全名；
+    /// - `qwen3.8-2.4t-a95b`、`qwen3.6-max-preview` 是纯文本，不能用 `qwen3-8-`、`qwen3-6-` 当前缀；
+    /// - `glm-5.3` 是纯文本，只有 Flash、FlashX 能看图；
+    /// - DeepSeek 只有 `deepseek-v4.1-flash` 能看图。
+    static func acceptsImages(_ modelID: String) -> Bool {
+        let modelID = normalized(modelID)
+        // 实时语音、同传、向量和排序模型不走这里的 Chat Completions
+        if ["realtime", "livetranslate", "embedding", "rerank"].contains(where: modelID.contains) { return false }
+        if imageModelNames.contains(modelID) { return true }
+        // 前缀要么等于全名，要么后面跟 `-`（快照日期），`qwen3-5-flash` 不会命中 `qwen3-5-flashx` 之类的别的型号
+        return imageModelPrefixes.contains { modelID == $0 || modelID.hasPrefix($0 + "-") }
+    }
+
+    /// 能看图的单个型号（没有快照，或者同系列里只有这一个快照能看图）。
+    private static let imageModelNames: Set<String> = [
+        "qwen3-7-max-2026-06-08",
+        "qwen3-8-27b", "qwen3-6-27b", "qwen3-6-35b-a3b",
+        "qwen3-5-397b-a17b", "qwen3-5-122b-a10b", "qwen3-5-27b", "qwen3-5-35b-a3b",
+        "deepseek-v4-1-flash",
+        "glm-5-3-flash", "glm-5-3-flashx",
+        "minimax-m3",
+        "step-3-7-flash", "step-5-preview",
+    ]
+
+    /// 能看图的型号族，包括带日期的快照。
+    private static let imageModelPrefixes: [String] = [
+        "qwen3-8-max", "qwen3-8-flash", "qwen3-8-omni-flash",
+        "qwen3-7-plus", "qwen3-7-flash",
+        "qwen3-6-plus", "qwen3-6-flash",
+        "qwen3-5-plus", "qwen3-5-flash", "qwen3-5-omni-plus", "qwen3-5-omni-flash", "qwen3-5-ocr",
+        "qwen3-vl", "qwen-vl", "qvq", "qwen3-omni-flash", "qwen-omni-turbo",
+        "kimi-k3", "kimi-k2-5", "kimi-k2-6", "kimi-k2-7-code",
+    ]
 
     static func supportsWebSearch(_ modelID: String, in region: Platform.BailianRegion) -> Bool {
         let modelID = normalized(modelID)
