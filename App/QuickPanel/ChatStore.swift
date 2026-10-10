@@ -26,6 +26,9 @@ final class ChatStore {
     private(set) var conversation: Conversation?
     private(set) var messages: [Message] = []
     private(set) var hasUnread = false
+    /// 最近一次发出（或 Retry）的用户 Message。Quick Panel 把它顶到消息区最上面，回答在下面生成时视图不跟着滚到底（#72）。
+    /// 换 Conversation 时清空，这时消息区照旧停在底部。
+    private(set) var anchoredQuestion: AnchoredQuestion?
     /// 发送前的问题，显示在消息区底部。目前都和 API key 有关（没有 key、读不出 key），旁边给「打开设置」。
     private(set) var notice: String?
     private var turn: TurnHandle? {
@@ -136,6 +139,7 @@ final class ChatStore {
         turn = nil
         conversation = makeConversation()
         messages = []
+        anchoredQuestion = nil
         notice = nil
         lastTurnEndedAt = nil
     }
@@ -306,6 +310,7 @@ final class ChatStore {
         // 没有得到回答的问题由 TurnRunner 在拼请求时去掉
         let history = messages
         messages.append(userMessage)
+        anchoredQuestion = AnchoredQuestion(messageID: userMessage.id)
         draft = ""
         notice = nil
 
@@ -343,6 +348,7 @@ final class ChatStore {
         let history = Array(messages.dropLast(2))
         // 旧回答先换成空的、生成中的回答，显示打字指示
         messages[messages.count - 1] = Message(id: oldAnswer.id, role: .assistant, status: .streaming, content: [])
+        anchoredQuestion = AnchoredQuestion(messageID: question.id)
         notice = nil
 
         start(TurnInput(
@@ -446,6 +452,13 @@ final class ChatStore {
             messages.append(message)
         }
     }
+}
+
+/// 要顶到消息区最上面的用户 Message。每次发送或 Retry 都是新的一次：
+/// 对同一条 Message 再 Retry 时 `request` 不同，消息区据此再滚一次。
+struct AnchoredQuestion: Equatable {
+    let messageID: UUID
+    let request = UUID()
 }
 
 /// 一个还没收尾的 Turn。

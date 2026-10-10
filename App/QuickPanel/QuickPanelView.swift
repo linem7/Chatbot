@@ -30,6 +30,7 @@ struct QuickPanelView: View {
                     } else {
                         MessageList(
                             messages: store.messages,
+                            anchoredQuestion: store.anchoredQuestion,
                             attachments: store.attachmentsByID,
                             lastAnswerActions: lastAnswerActions,
                             notice: store.notice,
@@ -213,32 +214,76 @@ private struct SendNotice: View {
     }
 }
 
-/// 消息列表。内容增长时保持贴在底部。
+/// 消息列表。平时内容增长时贴在底部；发出问题（或 Retry）后把这条用户 Message 顶到最上面，
+/// 回答在下面生成时不跟着往下滚（#72）。
 private struct MessageList: View {
     let messages: [Message]
+    /// 要顶到最上面的用户 Message；没有时整个列表照旧贴底。
+    let anchoredQuestion: AnchoredQuestion?
     /// 已经发出的附件，用户消息按 `attachmentRef` 查这里显示。
     let attachments: [UUID: Attachment]
     /// 只给最后一条回答。
     let lastAnswerActions: AnswerActionHandler?
     let notice: String?
     let openSettings: @MainActor () -> Void
+    /// 消息区可见部分的高度。顶上去的那一段至少要这么高，问题才能顶到最上面。
+    @State private var viewportHeight: CGFloat = 0
+
+    private static let spacing: CGFloat = 14
+    private static let padding = EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
+    private static let anchoredTurnID = "anchoredTurn"
+
+    private var anchorIndex: Int? {
+        guard let anchoredQuestion else { return nil }
+        return messages.firstIndex { $0.id == anchoredQuestion.messageID }
+    }
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                ForEach(messages) { message in
-                    MessageRow(
-                        message: message,
-                        attachments: message.attachmentIDs.compactMap { attachments[$0] },
-                        actions: message.id == messages.last?.id ? lastAnswerActions : nil
-                    )
+        let anchorIndex = self.anchorIndex
+        let split = anchorIndex ?? messages.count
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Self.spacing) {
+                    ForEach(messages[..<split]) { row($0) }
+                    // 顶上去的问题、它的回答和发送前的提示放在一起，至少占满可见高度；回答短时下面留白
+                    if split < messages.count || notice != nil {
+                        VStack(alignment: .leading, spacing: Self.spacing) {
+                            ForEach(messages[split...]) { row($0) }
+                            if let notice { SendNotice(text: notice, openSettings: openSettings) }
+                        }
+                        .frame(
+                            minHeight: anchorIndex == nil ? 0 : max(0, viewportHeight - Self.padding.bottom),
+                            alignment: .top
+                        )
+                        .id(Self.anchoredTurnID)
+                    }
                 }
-                if let notice { SendNotice(text: notice, openSettings: openSettings) }
+                .padding(Self.padding)
             }
-            .padding(EdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16))
+            .defaultScrollAnchor(.bottom)
+            // 有顶上去的问题时，内容变高保持上沿不动，不跟着回答滚到底
+            .defaultScrollAnchor(anchorIndex == nil ? .bottom : .top, for: .sizeChanges)
+            .onScrollGeometryChange(for: CGFloat.self) { $0.containerSize.height } action: { _, height in
+                viewportHeight = height
+            }
+            .onChange(of: anchoredQuestion) { _, anchoredQuestion in
+                guard anchoredQuestion != nil else { return }
+                // 等新消息和留白排好版再滚
+                Task { @MainActor in
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo(Self.anchoredTurnID, anchor: .top)
+                    }
+                }
+            }
         }
-        .defaultScrollAnchor(.bottom)
-        .defaultScrollAnchor(.bottom, for: .sizeChanges)
+    }
+
+    private func row(_ message: Message) -> some View {
+        MessageRow(
+            message: message,
+            attachments: message.attachmentIDs.compactMap { attachments[$0] },
+            actions: message.id == messages.last?.id ? lastAnswerActions : nil
+        )
     }
 }
 
