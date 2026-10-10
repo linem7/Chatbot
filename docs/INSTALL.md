@@ -3,14 +3,14 @@
 ## 系统要求
 
 - macOS 26 或以上。
-- Apple Silicon Mac（M 系列芯片）；v1.0.2 安装包不支持 Intel Mac。
+- Apple Silicon Mac（M 系列芯片）；v1.0.3 安装包不支持 Intel Mac。
 - 自己的模型服务 API key，以及该服务的可用额度和网络连接。应用不附带 API key，模型调用费用由服务商收取。
 
 在 **Apple menu › About This Mac** 查看系统版本和芯片。以下菜单名使用英文，界面语言会跟随系统。
 
 ## 下载和安装
 
-1. 打开 [v1.0.2 Release](https://github.com/linem7/Chatbot/releases/tag/v1.0.2)，在 **Assets** 下载 `Chatbot-1.0.2-macOS-arm64.zip`。也可以[直接下载安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.2/Chatbot-1.0.2-macOS-arm64.zip)。**Source code** 是开发者用的源码，不是安装包。
+1. 打开 [v1.0.3 Release](https://github.com/linem7/Chatbot/releases/tag/v1.0.3)，在 **Assets** 下载 `Chatbot-1.0.3-macOS-arm64.zip`。也可以[直接下载安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.3/Chatbot-1.0.3-macOS-arm64.zip)。**Source code** 是开发者用的源码，不是安装包。
 2. 双击 ZIP 解压，将 `Chatbot.app` 拖进 **Applications**。
 3. 从 **Applications** 打开 Chatbot。
 4. 应用使用自签名证书，没有经过 Apple 公证。如果首次打开提示 Apple 无法验证开发者或检查应用，在确认文件来自上述 Release 后，进入 **System Settings › Privacy & Security**，向下滚动，点击 **Open Anyway**，然后按提示确认 **Open**。需要先尝试打开一次，系统才会显示该入口。详见 [Apple 的打开说明](https://support.apple.com/en-us/102445)。

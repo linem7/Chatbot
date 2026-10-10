@@ -190,7 +190,7 @@
 
 ## 11. 分发与更新
 
-- **通过 GitHub Release 分发**：在本机用 Xcode 构建 Apple Silicon Release，使用固定自签名证书签名，不做公证（ADR-0005），手动上传应用 ZIP。最低 macOS 26。当前版本 1.0.1。
+- **通过 GitHub Release 分发**：在本机用 Xcode 构建 Apple Silicon Release，使用固定自签名证书签名，不做公证（ADR-0005），手动上传应用 ZIP。最低 macOS 26。当前版本见 [GitHub Releases](https://github.com/linem7/Chatbot/releases/latest)。
 - 首次打开如被拦截，用户进入 **System Settings › Privacy & Security › Open Anyway**。安装和升级步骤见 [安装指引](INSTALL.md)。
 - 不做更新检查、自动更新或 tag 自动发布；用户下载新版本手动替换应用。
 
