@@ -4,9 +4,9 @@
 
 ## 下载与安装
 
-**v1.0.3：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
+**v1.1.0：macOS 26 或以上，Apple Silicon（M 系列芯片）。**
 
-[下载 v1.0.3 安装包](https://github.com/linem7/Chatbot/releases/download/v1.0.3/Chatbot-1.0.3-macOS-arm64.zip) · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Chatbot/releases)
+[下载 v1.1.0 安装包](https://github.com/linem7/Chatbot/releases/download/v1.1.0/Chatbot-1.1.0-macOS-arm64.zip) · [完整安装指引](docs/INSTALL.md) · [所有版本](https://github.com/linem7/Chatbot/releases)
 
 解压后把 `Chatbot.app` 拖进 **Applications**。首次打开如被拦截，进入 **System Settings › Privacy & Security › Open Anyway**。应用采用自签名、未经过 Apple 公证；使用时需要自己的 API key。无需安装 Xcode 或创建证书。
 
@@ -186,7 +186,7 @@ CI（`.github/workflows/ci.yml`）在 push 到 main 和 PR 时执行同样的生
 
 ## 项目状态
 
-v1.0.3 通过 GitHub Release 分发。相对 v1.0.2，Quick Panel 在发送问题或 Retry 后将问题移到消息区最上面，回答生成时不再自动滚到底部。规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+v1.1.0 通过 GitHub Release 分发。相对 v1.0.3，修复 Quick Panel 首轮回答仍自动滚到底部的问题；发送问题或 Retry 后，用户 Message 与消息区顶部统一保留 20pt 间距。规格见 [docs/SPEC.md](docs/SPEC.md)，实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## Roadmap
 
@@ -203,3 +203,4 @@ v1.0.3 通过 GitHub Release 分发。相对 v1.0.2，Quick Panel 在发送问�
 - [x] v1.0.1：联网默认关闭，设置里可改成新对话默认开启
 - [x] v1.0.2：修复百炼视觉模型的图片输入能力判断
 - [x] v1.0.3：Quick Panel 发送问题后移到消息区最上面，回答生成时保持阅读位置
+- [x] v1.1.0：修复 Quick Panel 首轮滚动，统一问题顶部间距为 20pt
